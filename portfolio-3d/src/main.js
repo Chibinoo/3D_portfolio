@@ -11,10 +11,14 @@ scene.background = new THREE.Color(0x222222);
 
 //movement
 const points = [
-  new THREE.Vector3(0,1.6,5),
-  new THREE.Vector3(5,1.6,0),
-  new THREE.Vector3(-5,1.6,0),
-  new THREE.Vector3(0,1.6,-5)
+  new THREE.Vector3(-2,-1,2.3),//start
+  new THREE.Vector3(-0.65,-1,2.3),//about me key card
+  new THREE.Vector3(-0.01,-1,2.30),//poster 1
+  new THREE.Vector3(2.5,-1,2.3),//stairs
+  new THREE.Vector3(4.15,0.5,2.3),//after stairs
+  new THREE.Vector3(4.15,0.5,0.1),//
+  new THREE.Vector3(2,0.5,0.1),//
+  new THREE.Vector3(-2,0.5,0.1)//end
 ];
 
 let currentPoint=0;
@@ -40,10 +44,17 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
-camera.position.set(0,1.6,8);
+camera.position.set(-2,-1,2.3);// left right, up down, forwoard back
+camera.rotation.set(0,-1.55,0);
 
 //renderer
 const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.domElement.style.position = "fixed";
+renderer.domElement.style.top = "0";
+renderer.domElement.style.left = "0";
+renderer.domElement.style.width = "100vw";
+renderer.domElement.style.height = "100vh";
+renderer.domElement.style.zIndex = "1";
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
@@ -68,10 +79,77 @@ undefined,
 }
 );
 
-//controls
+//raycast
+const center=new THREE.Vector2(0,0);
+const raycaster=new THREE.Raycaster();
+
+//walking controls
 const controls = new PointerLockControls(camera, document.body);
 
 document.addEventListener('click', () => {
+  controls.lock();
+});
+
+//project details
+// Example projects
+const projects = {
+  poster1: {
+    title: "Project 2",
+    desc: "A Poster wowie"
+  },
+  key_card001: {
+    title: "Project 1",
+    desc: "Another Poster wowie"
+  }
+};
+
+// Grab DOM elements
+const titleEl = document.getElementById("projectTitle");
+const descEl = document.getElementById("projectDesc");
+const panel = document.getElementById("projectPanel");
+const closeBtn = document.getElementById("closeBtn");
+
+// Click event
+window.addEventListener("click", (event) => {
+  // Only check clicks when pointer is locked
+  if (!controls.isLocked) return;
+
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  const intersects = raycaster.intersectObjects(scene.children, true);
+
+  if (intersects.length > 0) {
+    const obj = intersects[0].object;
+
+    // Check if object has a project linked
+    if (projects[obj.name]) {
+      openProject(obj.name);
+    }
+  }
+});
+
+// Open project panel
+function openProject(name) {
+  const data = projects[name];
+  if (!data) return;
+
+  titleEl.textContent = data.title;
+  descEl.textContent = data.desc;
+
+  panel.style.display = "block";
+
+  // Unlock pointer so user can click buttons
+  controls.unlock();
+}
+
+// Close button
+closeBtn.addEventListener("click", () => {
+  panel.style.display = "none";
+
+  // Lock pointer again for movement
   controls.lock();
 });
 
@@ -89,6 +167,35 @@ function moveTo(index){
   currentPoint=index;
 }
 
+//object interaction
+window.addEventListener('click',()=>{
+  if(!controls.isLocked)return;
+  
+  raycaster.setFromCamera(center, camera);
+
+  const intersect=raycaster.intersectObjects(scene.children, true);
+
+  if(intersect.length>0){
+    const obj=intersect[0].object;
+    //console.log("Hit:", obj.name);
+    openProject(obj.name);
+  }
+});
+
+//tutorial logic
+startBtn.addEventListener('click', () => {
+  tutorial.style.display = 'none';
+  controls.lock();
+});
+
+//resize
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+//animater
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
