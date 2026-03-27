@@ -11,14 +11,42 @@ scene.background = new THREE.Color(0x222222);
 
 //movement
 const points = [
-  new THREE.Vector3(-2,-1,2.3),//start
-  new THREE.Vector3(-0.65,-1,2.3),//about me key card
-  new THREE.Vector3(-0.01,-1,2.30),//poster 1
-  new THREE.Vector3(2.5,-1,2.3),//stairs
-  new THREE.Vector3(4.15,0.5,2.3),//after stairs
-  new THREE.Vector3(4.15,0.5,0.1),//
-  new THREE.Vector3(2,0.5,0.1),//
-  new THREE.Vector3(-2,0.5,0.1)//end
+  {//start
+  pos: new THREE.Vector3(-2,-1,2.3),
+  rot: new THREE.Euler(0,-1.55,0)
+  },
+  {//about me key card
+  pos: new THREE.Vector3(-0.65,-1,2.3),
+  rot: new THREE.Euler(0,-1.55,0)
+  },
+  {//poster 1
+  pos: new THREE.Vector3(0.8,-1,2.3),
+  rot: new THREE.Euler(0,-1.55,0)
+  },
+  {//stairs
+  pos: new THREE.Vector3(2.5,-1,2.3),
+  rot: new THREE.Euler(0,-1.55,0)
+  },
+  {//after stairs
+  pos: new THREE.Vector3(4.15,0.5,2.3),
+  rot: new THREE.Euler(0,0,0)
+  },
+  {//
+  pos: new THREE.Vector3(4.15,0.5,0.1),
+  rot: new THREE.Euler(0,1.55,0)
+  },
+  {//
+  pos: new THREE.Vector3(2,0.5,0.1),
+  rot: new THREE.Euler(0,1.55,0)
+  },
+  {//dome
+  pos: new THREE.Vector3(-2,0.5,0.1),
+  rot: new THREE.Euler(0,-1.55,0)
+  },
+  {//end
+  pos: new THREE.Vector3(-2,0.5,0.1),
+  rot: new THREE.Euler(1.55,-0.6,1.55)
+  },
 ];
 
 let currentPoint=0;
@@ -60,8 +88,10 @@ renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
 
 //light
-const light=new THREE.AmbientLight(0xffffff, 1.5);
-scene.add(light);
+const light1=new THREE.AmbientLight(0xffffff, 1.5);
+const light2=new THREE.PointLight(0xffffff, 5.5);
+light2.position.set(-5,5,0.1);
+scene.add(light1, light2);
 
 //load model
 const loader=new GLTFLoader();
@@ -91,15 +121,14 @@ document.addEventListener('click', () => {
 });
 
 //project details
-// Example projects
 const projects = {
   poster1: {
     title: "Project 2",
     desc: "A Poster wowie"
   },
   key_card001: {
-    title: "Project 1",
-    desc: "Another Poster wowie"
+    title: "thats me",
+    desc: "No it dosen't open anythink :("
   }
 };
 
@@ -108,6 +137,10 @@ const titleEl = document.getElementById("projectTitle");
 const descEl = document.getElementById("projectDesc");
 const panel = document.getElementById("projectPanel");
 const closeBtn = document.getElementById("closeBtn");
+
+// Raycaster setup
+//const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 
 // Click event
 window.addEventListener("click", (event) => {
@@ -160,10 +193,17 @@ function moveTo(index){
 
   gsap.to(camera.position, {
     duration:1,
-    x: target.x,
-    y: target.y,
-    z: target.z,
+    x: target.pos.x,
+    y: target.pos.y,
+    z: target.pos.z,
   });
+  gsap.to(camera.rotation, {
+    duration:1,
+    x: target.rot.x,
+    y: target.rot.y,
+    z: target.rot.z,
+  });
+
   currentPoint=index;
 }
 
@@ -199,6 +239,7 @@ window.addEventListener('resize',()=>{
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
+  //console.log(camera.rotation);
 }
 
 animate();
