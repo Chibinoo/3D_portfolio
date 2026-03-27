@@ -89,15 +89,35 @@ document.body.appendChild(renderer.domElement);
 
 //light
 const light1=new THREE.AmbientLight(0xffffff, 1.5);
+
 const light2=new THREE.PointLight(0xffffff, 5.5);
-light2.position.set(-5,5,0.1);
+  light2.position.set(-5,5,0.1);
+  light2.castShadow = true;
+
+  light2.shadow.mapSize.width = 1024;
+  light2.shadow.mapSize.height = 1024;
+
+  light2.shadow.camera.near = 0.5;
+  light2.shadow.camera.far = 50;
+
 scene.add(light1, light2);
+
+//shadow
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFShadowMap;
 
 //load model
 const loader=new GLTFLoader();
 loader.load('/ruins.glb',(gltf)=>{
   const model=gltf.scene;
   model.scale.set(0.1, 0.1, 0.1)
+
+  model.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
 
   scene.add(model);
 
@@ -106,8 +126,7 @@ loader.load('/ruins.glb',(gltf)=>{
 undefined,
 (error)=>{
   console.error("Error loading model:", error);
-}
-);
+});
 
 //raycast
 const center=new THREE.Vector2(0,0);
