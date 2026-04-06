@@ -116,6 +116,19 @@ loader.load('/ruins.glb',(gltf)=>{
     if (child.isMesh) {
       child.castShadow = true;
       child.receiveShadow = true;
+
+      //add glow to projects
+      if (child.name==="poster1"){
+        child.userData.project="poster1";
+      }
+      if (child.name==="  key_card001"){
+        child.userData.project="  key_card001";
+      }
+      if(child.userData.project){
+        child.material=child.material.clone();
+        child.material.emissive=new THREE.Color(0x00ffff);
+        child.material.emissiveIntensity=1.2;
+      }
     }
   });
 
@@ -234,12 +247,27 @@ window.addEventListener('click',()=>{
 
   const intersect=raycaster.intersectObjects(scene.children, true);
 
-  if(intersect.length>0){
-    const obj=intersect[0].object;
+    //const obj=intersect[0].object;
     //console.log("Hit:", obj.name);
-    openProject(obj.name);
+    //openProject(obj.name);
+  if(intersect.length>0){
+    let obj=intersect[0].object;
+    const projectObj=findProjectObject(obj);
+    if(projectObj){
+      openProject(projectObj.userData.project);
+    }
   }
 });
+
+    function findProjectObject(obj){
+      while (obj){
+        if(obj.userData&&obj.userData.project){
+          return obj;
+        }
+        obj=obj.parent;
+      }
+      return null;
+    }
 
 //tutorial logic
 startBtn.addEventListener('click', () => {
