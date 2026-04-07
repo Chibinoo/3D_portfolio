@@ -60,13 +60,19 @@ const projects = {
   poster1: {
     title: "Project 2",
     desc: "A Poster wowie",
-    image: "/textures/poster1_textures.jpg",
+    images: [
+        "/textures/poster1_textures.jpg",
+        "/textures/poster2_textures.jpg"
+    ],
     glow: 4,
     outlineSize: 1.02,
   },
   key_card001: {
     title: "thats me",
     desc: "No it doesn't open anything :(",
+    images:[
+        "/textures/keycard_textures1.jpg"
+    ],
     glow: 2,
     outlineSize: 1,
     }
@@ -100,7 +106,7 @@ function addOutline(mesh, glow = 3, size = 1.03) {
 // ================= LOAD MODEL =================
 const loader = new GLTFLoader();
 
-loader.load('/ruins.glb', (gltf) => {
+    loader.load('/ruins.glb', (gltf) => {
   const model = gltf.scene;
   model.scale.set(0.1, 0.1, 0.1);
 
@@ -112,14 +118,19 @@ loader.load('/ruins.glb', (gltf) => {
 
     child.userData.project = child.name;
 
-    // ===== TEXTURE =====
-    const texture = textureLoader.load(project.image);
-    texture.flipY = false;
+    // Load first image only
+    const texture = textureLoader.load(project.images[0]);
+    texture.flipY = true;
+    
     texture.colorSpace = THREE.SRGBColorSpace;
 
     child.material = new THREE.MeshStandardMaterial({
-      map: texture
+      map: texture,
+      side: THREE.FrontSide,
     });
+
+    // Save textures array for this mesh
+    child.userData.textures = project.images.map(img => textureLoader.load(img));
 
     // ===== OUTLINE GLOW =====
     // ✅ use per-project values
@@ -167,22 +178,86 @@ const titleEl = document.getElementById("projectTitle");
 const descEl = document.getElementById("projectDesc");
 const panel = document.getElementById("projectPanel");
 const closeBtn = document.getElementById("closeBtn");
+const prevBtn = document.getElementById("prevImage");
+const nextBtn = document.getElementById("nextImage");
 
+let currentImageIndex = 0;
+let activeProjectName = null;
+let autoCycleInterval = null;
+
+// Show image in panel and update 3D texture
+function showImage(index) {
+  const data = projects[activeProjectName];
+  if (!data) return;
+
+  currentImageIndex = (index + data.images.length) % data.images.length;
+  projectImageEl.src = data.images[currentImageIndex];
+
+  // Update 3D model texture
+  const obj = scene.getObjectByProperty("name", activeProjectName);
+  if (obj && obj.isMesh) {
+    obj.material.map = obj.userData.textures[currentImageIndex];
+    obj.material.needsUpdate = true;
+  }
+}
+
+const projectImageEl = document.getElementById("projectImage");
+// Open project panel
 function openProject(name) {
   const data = projects[name];
   if (!data) return;
 
+  stopAutoCycle(); // stop auto cycling while panel is open
+
+  activeProjectName = name;
+  currentImageIndex = 0;
+
   titleEl.textContent = data.title;
   descEl.textContent = data.desc;
-  panel.style.display = "block";
+  projectImageEl.src = data.images[currentImageIndex];
 
+  panel.style.display = "block";
   controls.unlock();
 }
 
+// Close panel
 closeBtn.addEventListener("click", () => {
   panel.style.display = "none";
   controls.lock();
+
+  // restart auto cycling
+  if (activeProjectName) startAutoCycle(activeProjectName);
 });
+
+// Prev/Next buttons
+prevBtn.addEventListener("click", () => showImage(currentImageIndex - 1));
+nextBtn.addEventListener("click", () => showImage(currentImageIndex + 1));
+
+// ================= AUTO-CYCLE =================
+function startAutoCycle(name, delay = 3000) {
+  const project = projects[name];
+  if (!project || project.images.length < 2) return;
+
+  let index = 0;
+  const obj = scene.getObjectByProperty("name", name);
+
+  autoCycleInterval = setInterval(() => {
+    index = (index + 1) % project.images.length;
+
+    // Update 3D texture
+    if (obj && obj.isMesh) {
+      obj.material.map = obj.userData.textures[index];
+      obj.material.needsUpdate = true;
+    }
+  }, delay);
+}
+
+function stopAutoCycle() {
+  if (autoCycleInterval) {
+    clearInterval(autoCycleInterval);
+    autoCycleInterval = null;
+  }
+}
 
 // ================= MOVEMENT =================
 const points = [
