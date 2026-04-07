@@ -9,14 +9,15 @@ import gsap from "gsap";
 // ================= SCENE =================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x222222);
+
 const textureLoader = new THREE.TextureLoader();
 
 // ================= CAMERA =================
 const camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
 );
 
 camera.position.set(-2, -1, 2.3);
@@ -29,116 +30,136 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.toneMapping = THREE.ReinhardToneMapping;
 renderer.toneMappingExposure = 1.5;
 
-renderer.domElement.style.position = "fixed";
-renderer.domElement.style.top = "0";
-renderer.domElement.style.left = "0";
-
 document.body.appendChild(renderer.domElement);
 
 // ================= BLOOM =================
 const composer = new EffectComposer(renderer);
 
-const renderPass = new RenderPass(scene, camera);
-composer.addPass(renderPass);
+composer.addPass(new RenderPass(scene, camera));
 
 const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.1,  // strength
-    0.1,  // radius
-    0.85  // threshold
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.2,   // strength
+  0.6,   // radius
+  0.85   // threshold
 );
 
 composer.addPass(bloomPass);
 
 // ================= LIGHT =================
 const ambient = new THREE.AmbientLight(0xffffff, 1);
+
 const light = new THREE.PointLight(0xffffff, 5);
 light.position.set(-5, 5, 0);
 
-scene.add(ambient, light);
+scene.add(ambient);
+scene.add(light);
 
 // ================= PROJECT DATA =================
 const projects = {
-    poster1: {
-        title: "Project 2",
-        desc: "A Poster wowie",
-        image: "/textures/poster1_textures.jpg"
-    },
-    key_card001: {
-        title: "thats me",
-        desc: "No it doesn't open anything :("
+  poster1: {
+    title: "Project 2",
+    desc: "A Poster wowie",
+    image: "/textures/poster1_textures.jpg",
+    glow: 4,
+    outlineSize: 1.02,
+  },
+  key_card001: {
+    title: "thats me",
+    desc: "No it doesn't open anything :(",
+    glow: 2,
+    outlineSize: 1,
     }
 };
+
+// ================= OUTLINE FUNCTION =================
+function addOutline(mesh, glow = 3, size = 1.03) {
+  const geo = mesh.geometry.clone();
+
+  geo.computeBoundingBox();
+  const center = new THREE.Vector3();
+  geo.boundingBox.getCenter(center);
+  geo.translate(-center.x, -center.y, -center.z);
+
+  const outlineMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffff,
+    side: THREE.BackSide
+  });
+
+  // ✅ per-object glow strength
+  outlineMat.color.multiplyScalar(glow);
+
+  const outline = new THREE.Mesh(geo, outlineMat);
+  outline.scale.set(size, size, size);
+
+  outline.position.copy(center);
+
+  mesh.add(outline);
+}
 
 // ================= LOAD MODEL =================
 const loader = new GLTFLoader();
 
 loader.load('/ruins.glb', (gltf) => {
-    const model = gltf.scene;
-    model.scale.set(0.1, 0.1, 0.1);
+  const model = gltf.scene;
+  model.scale.set(0.1, 0.1, 0.1);
 
-    model.traverse((child) => {
-        if (!child.isMesh) return;
+  model.traverse((child) => {
+    if (!child.isMesh) return;
 
-        const project = projects[child.name];
+    const project = projects[child.name];
+    if (!project) return;
 
-        if (project) {
-            child.userData.project = child.name;
+    child.userData.project = child.name;
 
-            const texture = textureLoader.load(project.image);
-            texture.flipY = false;
-            texture.colorSpace = THREE.SRGBColorSpace;  // ensures colors look correct
+    // ===== TEXTURE =====
+    const texture = textureLoader.load(project.image);
+    texture.flipY = false;
+    texture.colorSpace = THREE.SRGBColorSpace;
 
-            // Support BOTH versions of Three.js
-            texture.colorSpace = THREE.SRGBColorSpace;
-            texture.encoding = THREE.sRGBEncoding;
-
-            child.material = new THREE.MeshStandardMaterial({
-                map: texture
-            });
-            child.material.needsUpdate = true;
-            //child.material.emissive = new THREE.Color(0xffffff);
-            child.material.emissiveIntensity = 0.5;
-        }
+    child.material = new THREE.MeshStandardMaterial({
+      map: texture
     });
 
-    scene.add(model);
+    // ===== OUTLINE GLOW =====
+    // ✅ use per-project values
+  addOutline(
+    child,
+    project.glow || 3,
+    project.outlineSize || 1.03
+  );
+  });
+
+  scene.add(model);
 });
 
 // ================= CONTROLS =================
 const controls = new PointerLockControls(camera, document.body);
 
-document.addEventListener('click', () => {
-    controls.lock();
-});
+document.addEventListener('click', () => controls.lock());
 
 // ================= RAYCAST =================
 const raycaster = new THREE.Raycaster();
 const center = new THREE.Vector2(0, 0);
 
 function findProjectObject(obj) {
-    while (obj) {
-        if (obj.userData && obj.userData.project) return obj;
-        obj = obj.parent;
-    }
-    return null;
+  while (obj) {
+    if (obj.userData?.project) return obj;
+    obj = obj.parent;
+  }
+  return null;
 }
 
-// ================= CLICK =================
 window.addEventListener('click', () => {
-    if (!controls.isLocked) return;
+  if (!controls.isLocked) return;
 
-    raycaster.setFromCamera(center, camera);
-    const intersects = raycaster.intersectObjects(scene.children, true);
+  raycaster.setFromCamera(center, camera);
+  const hits = raycaster.intersectObjects(scene.children, true);
 
-    if (intersects.length > 0) {
-        const obj = intersects[0].object;
-        const projectObj = findProjectObject(obj);
-
-        if (projectObj) {
-            openProject(projectObj.userData.project);
-        }
-    }
+  if (hits.length > 0) {
+    const obj = findProjectObject(hits[0].object);
+    if (obj) openProject(obj.userData.project);
+  }
 });
 
 // ================= UI =================
@@ -148,78 +169,68 @@ const panel = document.getElementById("projectPanel");
 const closeBtn = document.getElementById("closeBtn");
 
 function openProject(name) {
-    const data = projects[name];
-    if (!data) return;
+  const data = projects[name];
+  if (!data) return;
 
-    titleEl.textContent = data.title;
-    descEl.textContent = data.desc;
-    panel.style.display = "block";
+  titleEl.textContent = data.title;
+  descEl.textContent = data.desc;
+  panel.style.display = "block";
 
-    controls.unlock();
+  controls.unlock();
 }
 
 closeBtn.addEventListener("click", () => {
-    panel.style.display = "none";
-    controls.lock();
+  panel.style.display = "none";
+  controls.lock();
 });
 
 // ================= MOVEMENT =================
 const points = [
-    { pos: new THREE.Vector3(-2, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-    { pos: new THREE.Vector3(-0.65, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-    { pos: new THREE.Vector3(0.8, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-    { pos: new THREE.Vector3(2.5, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-    { pos: new THREE.Vector3(4.15, 0.5, 2.3), rot: new THREE.Euler(0, 0, 0) }
+  { pos: new THREE.Vector3(-2,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(-0.65,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(0.8,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(2.5,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(4.15,0.5,2.3), rot: new THREE.Euler(0,0,0) }
 ];
 
 let currentPoint = 0;
 
 document.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowRight") moveTo((currentPoint + 1) % points.length);
-    if (e.key === "ArrowLeft") moveTo((currentPoint - 1 + points.length) % points.length);
+  if (e.key === "ArrowRight") moveTo((currentPoint + 1) % points.length);
+  if (e.key === "ArrowLeft") moveTo((currentPoint - 1 + points.length) % points.length);
 });
 
-function moveTo(index) {
-    const target = points[index];
+function moveTo(i) {
+  const t = points[i];
 
-    gsap.to(camera.position, {
-        duration: 1,
-        x: target.pos.x,
-        y: target.pos.y,
-        z: target.pos.z,
-    });
+  gsap.to(camera.position, { duration: 1, ...t.pos });
+  gsap.to(camera.rotation, { duration: 1, ...t.rot });
 
-    gsap.to(camera.rotation, {
-        duration: 1,
-        x: target.rot.x,
-        y: target.rot.y,
-        z: target.rot.z,
-    });
-
-    currentPoint = index;
+  currentPoint = i;
 }
-// ================= Tutorial =================
+
+// ================= TUTORIAL =================
 startBtn.addEventListener('click', () => {
-    tutorial.style.display = 'none';
-    controls.lock();
+  tutorial.style.display = 'none';
+  controls.lock();
 });
 
 // ================= RESIZE =================
 window.addEventListener('resize', () => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
 
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
 
-    renderer.setSize(w, h);
-    composer.setSize(w, h);
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
 });
 
 // ================= LOOP =================
 function animate() {
-    requestAnimationFrame(animate);
-    composer.render();
+  requestAnimationFrame(animate);
+  composer.render();
 }
 
 animate();
