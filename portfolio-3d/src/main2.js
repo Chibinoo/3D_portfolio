@@ -20,6 +20,7 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(-2, -1, 2.3);
 camera.rotation.set(0, -1.55, 0);
+console.log(camera.position);
 
 // ================= RENDERER =================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -164,7 +165,13 @@ function stopAutoCycle(name) {
 // ================= CONTROLS =================
 const controls = new PointerLockControls(camera, document.body);
 document.addEventListener('click', (e) => {
-  if (panel.style.display === "block") return; // don't lock when UI open
+  // ❌ don't lock if panel is open
+  if (panel.classList.contains("active")) return;
+
+  // ❌ don't lock if clicking UI elements
+  if (e.target.closest("#projectPanel")) return;
+  if (e.target.closest("#overlay")) return;
+
   controls.lock();
 });
 
@@ -227,6 +234,7 @@ function showImage(index) {
 // Open project
 function openProject(name) {
   const data = projects[name];
+  const overlay = document.getElementById("overlay");
   if (!data) return;
 
   stopAutoCycle(name);
@@ -239,12 +247,24 @@ function openProject(name) {
   projectImageEl.src = data.images[0];
 
   panel.classList.add("active");
+  overlay.classList.add("active");
   if (controls.isLocked) controls.unlock();
 }
 
 // Close panel
 closeBtn.addEventListener("click", () => {
   panel.classList.remove("active");
+  overlay.classList.remove("active");
+
+  if (activeProjectName) {
+    const obj = scene.getObjectByProperty("name", activeProjectName);
+    if (obj) startAutoCycle(obj);
+  }
+});
+
+overlay.addEventListener("click", () => {
+  panel.classList.remove("active");
+  overlay.classList.remove("active");
 
   if (activeProjectName) {
     const obj = scene.getObjectByProperty("name", activeProjectName);
