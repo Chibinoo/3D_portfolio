@@ -1,28 +1,43 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/style.css">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>portfolio-3d</title>
-  </head>
-  <body>
-    <div id="crosshair">+</div>
-    <script type="module" src="/src/main2.js"></script>
-    <div id="tutorial">
-      <h1>Welcome</h1>
-      <p>Click and move the mouse to look around</p>
-      <p>Use → and ← to walk</p>
-      <button id="startBtn">Enter</button>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="/src/style.css">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>portfolio-3d</title>
+</head>
+
+<body>
+  <div id="crosshair">+</div>
+  <script type="module" src="/src/main2.js"></script>
+  <div id="tutorial">
+    <h1>Welcome</h1>
+    <p>Click and move the mouse to look around</p>
+    <p>Use → and ← to walk</p>
+    <button id="startBtn">Enter</button>
+  </div>
+  <div id="projectPanel">
+    <div class="panel-content">
+
+      <div class="image-container">
+        <img id="projectImage" src="" />
+      </div>
+
+      <div class="text-container">
+        <h2 id="projectTitle"></h2>
+        <p id="projectDesc"></p>
+
+        <div class="buttons">
+          <button id="prevImage">←</button>
+          <button id="nextImage">→</button>
+          <button id="closeBtn">✕</button>
+        </div>
+      </div>
+
     </div>
-    <div id="projectPanel">
-      <h2 id="projectTitle"></h2>
-      <p id="projectDesc"></p>
-      <img id="projectImage" src="" alt="Project Image">
-      <button id="prevImage">Prev</button>
-      <button id="nextImage">Next</button>
-      <button id="closeBtn">Close</button>
-    </div>
-  </body>
+  </div>
+</body>
+
 </html>

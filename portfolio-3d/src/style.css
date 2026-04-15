@@ -67,3 +67,103 @@ canvas {
   margin-top:10px; 
   cursor:pointer;
 }
+#projectPanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  
+  width: 70%;
+  max-width: 900px;
+  height: 400px;
+
+  background: rgba(0, 0, 0, 0.8); /* ✅ 80% opacity */
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+
+  display: none;
+  opacity: 0;
+
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+/* active state */
+#projectPanel.active {
+  display: block;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.panel-content {
+  display: flex;
+  height: 100%;
+  padding: 20px;
+  gap: 20px;
+}
+
+/* IMAGE SIDE */
+.image-container {
+  flex: 1.2;
+  overflow: hidden;
+  border-radius: 15px;
+}
+
+#projectImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+
+  transform: scale(1.1); /* ✅ zoomed look */
+  transition: transform 0.5s ease;
+}
+
+/* subtle hover zoom */
+#projectImage:hover {
+  transform: scale(1.2);
+}
+
+/* TEXT SIDE */
+.text-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  color: white;
+}
+
+#projectTitle {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+#projectDesc {
+  font-size: 16px;
+  opacity: 0.8;
+}
+/* BUTTONS */
+.buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.buttons button {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+.buttons button:hover {
+  background: rgba(255,255,255,0.25);
+  transform: translateY(-2px);
+}
+#projectImage {
+  transition: transform 0.5s ease, opacity 0.3s ease;
+}
