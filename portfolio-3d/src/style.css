@@ -1,5 +1,4 @@
-html,
-body {
+html, body {
   margin: 0;
   padding: 0;
   width: 100vw;
@@ -13,6 +12,7 @@ canvas {
   left: 0;
 }
 
+/* CROSSHAIR */
 #crosshair {
   position: fixed;
   top: 50vh;
@@ -24,60 +24,68 @@ canvas {
   z-index: 100;
 }
 
-#tutorial {
-  padding: 10px 50px;
+/* LOGIN */
+#loginUI {
   position: fixed;
-  background-color: rgba(70, 131, 180, 0.9);
+  inset: 0;
+  z-index: 10000;
+
+  display: none;
+  justify-content: center;
+  align-items: center;
+
+  pointer-events: none;
+}
+
+#loginUI.active {
+  display: flex;
+  pointer-events: auto;
+}
+
+.login-box {
+  background: rgba(0,0,0,0.8);
+  padding: 20px;
+  border-radius: 12px;
+}
+
+/* TUTORIAL */
+#tutorial {
+  position: fixed;
   top: 50vh;
   left: 50vw;
   transform: translate(-50%, -50%);
-  color: white;
-  font-size: 20px;
-  z-index: 9999;
 
-  display: flex; /* enable flex layout */
-  flex-direction: column;  /* stack text + button vertically */
-  align-items: center;  /* center horizontally */
-  gap: 10px;  /* optional space between text and button */
-}
-
-#startBtn {
-  font-size: 20px;
+  background: rgba(70,131,180,0.9);
   color: white;
-  background-color: black;
-  padding: 10px 20px;
-  border: none;
-  cursor: pointer;
-}
 
-#projectPanel {
-  display: none;
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(70, 131, 180, 0.9);
-  color: white;
   padding: 20px;
-  z-index: 9999;
-  text-align: center
+  z-index: 9000;
+
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+
+  pointer-events: none;
 }
-#closeBtn{
-  padding:10px 20px; 
-  margin-top:10px; 
-  cursor:pointer;
+
+#tutorial.active {
+  display: flex;
+  pointer-events: auto;
 }
+
+/* PROJECT PANEL */
 #projectPanel {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%) scale(0.9);
-  
+
   width: 70%;
   max-width: 900px;
   height: 400px;
 
-  background: rgba(0, 0, 0, 0.8); /* ✅ 80% opacity */
+  background: rgba(0,0,0,0.8);
   border-radius: 20px;
   backdrop-filter: blur(10px);
 
@@ -88,12 +96,10 @@ canvas {
   z-index: 1000;
 }
 
-/* active state */
 #projectPanel.active {
   display: block;
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
 }
 
 .panel-content {
@@ -103,7 +109,6 @@ canvas {
   gap: 20px;
 }
 
-/* IMAGE SIDE */
 .image-container {
   flex: 1.2;
   overflow: hidden;
@@ -113,38 +118,17 @@ canvas {
 #projectImage {
   width: 100%;
   height: 100%;
-
-  object-fit: cover;   /* ✅ fills box nicely */
-  object-position: center;
-
-  transition: transform 0.5s ease, opacity 0.3s ease;
+  object-fit: cover;
 }
 
-/* subtle hover zoom */
-.image-container:hover #projectImage {
-  transform: scale(1.05);
-}
-
-/* TEXT SIDE */
 .text-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-
   color: white;
 }
 
-#projectTitle {
-  font-size: 28px;
-  margin-bottom: 10px;
-}
-
-#projectDesc {
-  font-size: 16px;
-  opacity: 0.8;
-}
-/* BUTTONS */
 .buttons {
   display: flex;
   gap: 10px;
@@ -157,37 +141,4 @@ canvas {
   padding: 10px 14px;
   border-radius: 10px;
   cursor: pointer;
-
-  transition: all 0.2s ease;
-}
-
-.buttons button:hover {
-  background: rgba(255,255,255,0.25);
-  transform: translateY(-2px);
-}
-#projectImage {
-  transition: transform 0.5s ease, opacity 0.3s ease;
-}
-/* BACKGROUND OVERLAY */
-#overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-
-  background: rgba(0, 0, 0, 0.5); /* darken */
-  backdrop-filter: blur(8px);     /* blur scene */
-
-  opacity: 0;
-  pointer-events: none;
-
-  transition: opacity 0.3s ease;
-  z-index: 999;
-}
-
-/* active state */
-#overlay.active {
-  opacity: 1;
-  pointer-events: all;
 }

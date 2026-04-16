@@ -6,10 +6,13 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import gsap from "gsap";
 
+import { initLogin } from "./login.js";
+
 // ================= SCENE =================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x222222);
 const textureLoader = new THREE.TextureLoader();
+let loginFinished = false;
 
 // ================= CAMERA =================
 const camera = new THREE.PerspectiveCamera(
@@ -18,29 +21,27 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
+
 camera.position.set(-2, -1, 2.3);
-camera.rotation.set(0, -1.55, 0);
-console.log(camera.position);
 
 // ================= RENDERER =================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
-renderer.toneMapping = THREE.ReinhardToneMapping;
-renderer.toneMappingExposure = 1.5;
 document.body.appendChild(renderer.domElement);
 
-// ================= BLOOM =================
+// ================= POST =================
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.2,
-  0.6,
-  0.85
+composer.addPass(
+  new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    1.2,
+    0.6,
+    0.85
+  )
 );
-composer.addPass(bloomPass);
 
 // ================= LIGHT =================
 scene.add(new THREE.AmbientLight(0xffffff, 1));
@@ -72,34 +73,31 @@ const projects = {
   }
 };
 
-// ================= OUTLINE =================
-function addOutline(mesh, glow = 3, size = 1.03) {
-  const geo = mesh.geometry.clone();
-  geo.computeBoundingBox();
-
-  const center = new THREE.Vector3();
-  geo.boundingBox.getCenter(center);
-  geo.translate(-center.x, -center.y, -center.z);
-
-  const outlineMat = new THREE.MeshBasicMaterial({
-    color: 0x00ffff,
-    side: THREE.BackSide
-  });
-
-  outlineMat.color.multiplyScalar(glow);
-
-  const outline = new THREE.Mesh(geo, outlineMat);
-  outline.scale.set(size, size, size);
-  outline.position.copy(center);
-
-  mesh.add(outline);
-}
-
-// ================= AUTO CYCLE STORAGE =================
+// ================= AUTO CYCLE =================
 const autoCycles = {};
 
-// ================= LOAD MODEL =================
+function startAutoCycle(obj, delay = 3000) {
+  if (!obj?.userData?.textures) return;
+
+  let i = 0;
+
+  autoCycles[obj.name] = setInterval(() => {
+    i = (i + 1) % obj.userData.textures.length;
+    obj.material.map = obj.userData.textures[i];
+    obj.material.needsUpdate = true;
+  }, delay);
+}
+function stopAutoCycle(name) {
+  if (autoCycles[name]) {
+    clearInterval(autoCycles[name]);
+    delete autoCycles[name];
+  }
+}
+// ================= MODEL =================
 const loader = new GLTFLoader();
+
+let sdCard = null;
+let sdCardTarget = null;
 
 loader.load('/ruins.glb', (gltf) => {
   const model = gltf.scene;
@@ -108,59 +106,50 @@ loader.load('/ruins.glb', (gltf) => {
   model.traverse((child) => {
     if (!child.isMesh) return;
 
+    // LOGIN OBJECTS
+    if (child.name === "sd_card") sdCard = child;
+    if (child.name === "sd_card_target") sdCardTarget = child;
+
+    // PROJECTS
     const project = projects[child.name];
-    if (!project) return;
+        if (!project) return;
+    
+        if (!project.images || project.images.length === 0) return;
+    
+        child.userData.project = child.name;
+    
+        // Load textures
+        const textures = project.images.map(img => {
+          const tex = textureLoader.load(img);
+          tex.flipY = false;
+          tex.colorSpace = THREE.SRGBColorSpace;
+          return tex;
+        });
+    
+        child.userData.textures = textures;
+    
+        // Apply first texture
+        child.material = new THREE.MeshStandardMaterial({
+          map: textures[0]
+        });
 
-    if (!project.images || project.images.length === 0) return;
-
-    child.userData.project = child.name;
-
-    // Load textures
-    const textures = project.images.map(img => {
-      const tex = textureLoader.load(img);
-      tex.flipY = false;
-      tex.colorSpace = THREE.SRGBColorSpace;
-      return tex;
-    });
-
-    child.userData.textures = textures;
-
-    // Apply first texture
-    child.material = new THREE.MeshStandardMaterial({
-      map: textures[0]
-    });
-
-    addOutline(child, project.glow || 3, project.outlineSize || 1.03);
-
-    // ✅ Start auto-cycle immediately
-    if (textures.length > 1) {
-      startAutoCycle(child);
-    }
+    if (textures.length > 1) startAutoCycle(child);
   });
 
   scene.add(model);
+
+  // ================= LOGIN =================
+  initLogin({
+    sdCard,
+    sdCardTarget,
+    controls,
+    startMainExperience: () => {
+      loginFinished = true;
+
+      moveTo(0); // go to first point after login
+    }
+  });
 });
-
-// ================= AUTO-CYCLE =================
-function startAutoCycle(obj, delay = 3000) {
-  if (!obj || !obj.userData.textures) return;
-
-  let index = 0;
-
-  autoCycles[obj.name] = setInterval(() => {
-    index = (index + 1) % obj.userData.textures.length;
-
-    obj.material.map = obj.userData.textures[index];
-    obj.material.needsUpdate = true;
-  }, delay);
-}
-
-function stopAutoCycle(name) {
-  if (autoCycles[name]) {
-    clearInterval(autoCycles[name]);
-    delete autoCycles[name];
-  }
-}
 
 // ================= CONTROLS =================
 const controls = new PointerLockControls(camera, document.body);
@@ -199,7 +188,68 @@ window.addEventListener('click', () => {
   }
 });
 
-// ================= UI =================
+// ================= MOVEMENT (YOUR SYSTEM) =================
+const points = [
+  { pos: new THREE.Vector3(-2,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(-0.65,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(0.8,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(2.5,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(4.15,0.5,2.3), rot: new THREE.Euler(0,0,0) },
+  { pos: new THREE.Vector3(4.15,0.5,0.1), rot: new THREE.Euler(0,1.55,0) },
+  { pos: new THREE.Vector3(2,0.5,0.1), rot: new THREE.Euler(0,1.55,0) },
+  { pos: new THREE.Vector3(-2,0.5,0.1), rot: new THREE.Euler(0,-1.55,0) },
+  { pos: new THREE.Vector3(-2,0.5,0.1), rot: new THREE.Euler(1.55,-0.6,1.55) }
+];
+
+let currentPoint = 0;
+
+// KEYBOARD NAVIGATION
+document.addEventListener("keydown", (e) => {
+  if (!loginFinished) return;
+
+  if (e.key === "ArrowRight") {
+    moveTo((currentPoint + 1) % points.length);
+  }
+
+  if (e.key === "ArrowLeft") {
+    moveTo((currentPoint - 1 + points.length) % points.length);
+  }
+});
+
+// MOVE FUNCTION
+function moveTo(i) {
+  const t = points[i];
+
+  // unlock during animation (important)
+  if (controls.isLocked) controls.unlock();
+
+  // move position
+  gsap.to(camera.position, {
+    x: t.pos.x,
+    y: t.pos.y,
+    z: t.pos.z,
+    duration: 1.2,
+    ease: "power2.inOut"
+  });
+
+  // rotate camera directly (works in your version)
+  gsap.to(camera.rotation, {
+    x: t.rot.x,
+    y: t.rot.y,
+    z: t.rot.z,
+    duration: 1.2,
+    ease: "power2.inOut"
+  });
+
+  currentPoint = i;
+
+  // relock AFTER movement (must be user-triggered → so delay is fine here)
+  setTimeout(() => {
+    // ❗ do NOT force lock → just allow next click to lock
+  }, 1200);
+}
+
+// ================= PROJECT PANEL =================
 const titleEl = document.getElementById("projectTitle");
 const descEl = document.getElementById("projectDesc");
 const projectImageEl = document.getElementById("projectImage");
@@ -276,39 +326,12 @@ overlay.addEventListener("click", () => {
 prevBtn.addEventListener("click", () => showImage(currentImageIndex - 1));
 nextBtn.addEventListener("click", () => showImage(currentImageIndex + 1));
 
-// ================= MOVEMENT =================
-const points = [
-  { pos: new THREE.Vector3(-2, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(-0.65, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(0.8, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(2.5, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(4.15, 0.5, 2.3), rot: new THREE.Euler(0, 0, 0) }
-];
-
-let currentPoint = 0;
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowRight") moveTo((currentPoint + 1) % points.length);
-  if (e.key === "ArrowLeft") moveTo((currentPoint - 1 + points.length) % points.length);
-});
-
-function moveTo(i) {
-  const t = points[i];
-  gsap.to(camera.position, { duration: 1, ...t.pos });
-  gsap.to(camera.rotation, { duration: 1, ...t.rot });
-  currentPoint = i;
+// ================= LOOP =================
+function animate() {
+  requestAnimationFrame(animate);
+  composer.render();
 }
-
-// ================= TUTORIAL =================
-const startBtn = document.getElementById("startBtn");
-const tutorial = document.getElementById("tutorial");
-
-if (startBtn && tutorial) {
-  startBtn.addEventListener('click', () => {
-    tutorial.style.display = 'none';
-    controls.lock();
-  });
-}
+animate();
 
 // ================= RESIZE =================
 window.addEventListener('resize', () => {
@@ -321,10 +344,3 @@ window.addEventListener('resize', () => {
   renderer.setSize(w, h);
   composer.setSize(w, h);
 });
-
-// ================= LOOP =================
-function animate() {
-  requestAnimationFrame(animate);
-  composer.render();
-}
-animate();

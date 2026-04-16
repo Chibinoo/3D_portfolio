@@ -1,292 +1,330 @@
 import * as THREE from 'three';
-import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import gsap from "gsap";
 
-console.log("JS is running");
-
-//scene
+// ================= SCENE =================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x222222);
+const textureLoader = new THREE.TextureLoader();
 
-//movement
-const points = [
-  {//start
-  pos: new THREE.Vector3(-2,-1,2.3),
-  rot: new THREE.Euler(0,-1.55,0)
-  },
-  {//about me key card
-  pos: new THREE.Vector3(-0.65,-1,2.3),
-  rot: new THREE.Euler(0,-1.55,0)
-  },
-  {//poster 1
-  pos: new THREE.Vector3(0.8,-1,2.3),
-  rot: new THREE.Euler(0,-1.55,0)
-  },
-  {//stairs
-  pos: new THREE.Vector3(2.5,-1,2.3),
-  rot: new THREE.Euler(0,-1.55,0)
-  },
-  {//after stairs
-  pos: new THREE.Vector3(4.15,0.5,2.3),
-  rot: new THREE.Euler(0,0,0)
-  },
-  {//
-  pos: new THREE.Vector3(4.15,0.5,0.1),
-  rot: new THREE.Euler(0,1.55,0)
-  },
-  {//
-  pos: new THREE.Vector3(2,0.5,0.1),
-  rot: new THREE.Euler(0,1.55,0)
-  },
-  {//dome
-  pos: new THREE.Vector3(-2,0.5,0.1),
-  rot: new THREE.Euler(0,-1.55,0)
-  },
-  {//end
-  pos: new THREE.Vector3(-2,0.5,0.1),
-  rot: new THREE.Euler(1.55,-0.6,1.55)
-  },
-];
-
-let currentPoint=0;
-
-//keyboard 
-document.addEventListener("keydown", (e)=>{
-  console.log("Key pressed:", e.key);
-
-  if(e.key==="ArrowRight"){
-    moveTo((currentPoint+1)%points.length);
-  }
-
-  if(e.key==="ArrowLeft"){
-    moveTo((currentPoint-1+points.length)%points.length);
-  }
-})
-
-//camera
+// ================= CAMERA =================
 const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.1,
   1000
 );
+camera.position.set(-2, -1, 2.3);
+camera.rotation.set(0, -1.55, 0);
+console.log(camera.position);
 
-camera.position.set(-2,-1,2.3);// left right, up down, forwoard back
-camera.rotation.set(0,-1.55,0);
-
-//renderer
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.domElement.style.position = "fixed";
-renderer.domElement.style.top = "0";
-renderer.domElement.style.left = "0";
-renderer.domElement.style.width = "100vw";
-renderer.domElement.style.height = "100vh";
-renderer.domElement.style.zIndex = "1";
+// ================= RENDERER =================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
+renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.toneMappingExposure = 1.5;
 document.body.appendChild(renderer.domElement);
 
-//light
-const light1=new THREE.AmbientLight(0xffffff, 1.5);
+// ================= BLOOM =================
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
 
-const light2=new THREE.PointLight(0xffffff, 5.5);
-  light2.position.set(-5,5,0.1);
-  light2.castShadow = true;
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.2,
+  0.6,
+  0.85
+);
+composer.addPass(bloomPass);
 
-  light2.shadow.mapSize.width = 1024;
-  light2.shadow.mapSize.height = 1024;
+// ================= LIGHT =================
+scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-  light2.shadow.camera.near = 0.5;
-  light2.shadow.camera.far = 50;
+const light = new THREE.PointLight(0xffffff, 5);
+light.position.set(-5, 5, 0);
+scene.add(light);
 
-scene.add(light1, light2);
+// ================= PROJECT DATA =================
+const projects = {
+  poster1: {
+    title: "Project 2",
+    desc: "A Poster wowie",
+    images: [
+      "/textures/poster1_textures.jpg",
+      "/textures/poster2_textures.jpg"
+    ],
+    glow: 4,
+    outlineSize: 1.02,
+  },
+  key_card001: {
+    title: "thats me",
+    desc: "No it doesn't open anything :(",
+    images: [
+      "/textures/keycard_textures1.jpg"
+    ],
+    glow: 2,
+    outlineSize: 1,
+  }
+};
 
-//shadow
-renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFShadowMap;
+// ================= OUTLINE =================
+function addOutline(mesh, glow = 3, size = 1.03) {
+  const geo = mesh.geometry.clone();
+  geo.computeBoundingBox();
 
-//load model
-const loader=new GLTFLoader();
-loader.load('/ruins.glb',(gltf)=>{
-  const model=gltf.scene;
-  model.scale.set(0.1, 0.1, 0.1)
+  const center = new THREE.Vector3();
+  geo.boundingBox.getCenter(center);
+  geo.translate(-center.x, -center.y, -center.z);
+
+  const outlineMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffff,
+    side: THREE.BackSide
+  });
+
+  outlineMat.color.multiplyScalar(glow);
+
+  const outline = new THREE.Mesh(geo, outlineMat);
+  outline.scale.set(size, size, size);
+  outline.position.copy(center);
+
+  mesh.add(outline);
+}
+
+// ================= AUTO CYCLE STORAGE =================
+const autoCycles = {};
+
+// ================= LOAD MODEL =================
+const loader = new GLTFLoader();
+
+loader.load('/ruins.glb', (gltf) => {
+  const model = gltf.scene;
+  model.scale.set(0.1, 0.1, 0.1);
 
   model.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
+    if (!child.isMesh) return;
 
-      //add glow to projects
-      if (child.name==="poster1"){
-        child.userData.project="poster1";
-      }
-      if (child.name==="  key_card001"){
-        child.userData.project="  key_card001";
-      }
-      if(child.userData.project){
-        child.material=child.material.clone();
-        child.material.emissive=new THREE.Color(0x00ffff);
-        child.material.emissiveIntensity=1.2;
-      }
+    const project = projects[child.name];
+    if (!project) return;
+
+    if (!project.images || project.images.length === 0) return;
+
+    child.userData.project = child.name;
+
+    // Load textures
+    const textures = project.images.map(img => {
+      const tex = textureLoader.load(img);
+      tex.flipY = false;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    });
+
+    child.userData.textures = textures;
+
+    // Apply first texture
+    child.material = new THREE.MeshStandardMaterial({
+      map: textures[0]
+    });
+
+    addOutline(child, project.glow || 3, project.outlineSize || 1.03);
+
+    // ✅ Start auto-cycle immediately
+    if (textures.length > 1) {
+      startAutoCycle(child);
     }
   });
 
   scene.add(model);
-
-  console.log("Model loaded", model);
-},
-undefined,
-(error)=>{
-  console.error("Error loading model:", error);
 });
 
-//raycast
-const center=new THREE.Vector2(0,0);
-const raycaster=new THREE.Raycaster();
+// ================= AUTO-CYCLE =================
+function startAutoCycle(obj, delay = 3000) {
+  if (!obj || !obj.userData.textures) return;
 
-//walking controls
+  let index = 0;
+
+  autoCycles[obj.name] = setInterval(() => {
+    index = (index + 1) % obj.userData.textures.length;
+
+    obj.material.map = obj.userData.textures[index];
+    obj.material.needsUpdate = true;
+  }, delay);
+}
+
+function stopAutoCycle(name) {
+  if (autoCycles[name]) {
+    clearInterval(autoCycles[name]);
+    delete autoCycles[name];
+  }
+}
+
+// ================= CONTROLS =================
 const controls = new PointerLockControls(camera, document.body);
+document.addEventListener('click', (e) => {
+  // ❌ don't lock if panel is open
+  if (panel.classList.contains("active")) return;
 
-document.addEventListener('click', () => {
+  // ❌ don't lock if clicking UI elements
+  if (e.target.closest("#projectPanel")) return;
+  if (e.target.closest("#overlay")) return;
+
   controls.lock();
 });
 
-//project details
-const projects = {
-  poster1: {
-    title: "Project 2",
-    desc: "A Poster wowie"
-  },
-  key_card001: {
-    title: "thats me",
-    desc: "No it dosen't open anythink :("
+// ================= RAYCAST =================
+const raycaster = new THREE.Raycaster();
+const center = new THREE.Vector2(0, 0);
+
+function findProjectObject(obj) {
+  while (obj) {
+    if (obj.userData?.project) return obj;
+    obj = obj.parent;
   }
-};
+  return null;
+}
 
-// Grab DOM elements
-const titleEl = document.getElementById("projectTitle");
-const descEl = document.getElementById("projectDesc");
-const panel = document.getElementById("projectPanel");
-const closeBtn = document.getElementById("closeBtn");
-
-// Raycaster setup
-//const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-// Click event
-window.addEventListener("click", (event) => {
-  // Only check clicks when pointer is locked
+window.addEventListener('click', () => {
   if (!controls.isLocked) return;
 
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(center, camera);
+  const hits = raycaster.intersectObjects(scene.children, true);
 
-  raycaster.setFromCamera(mouse, camera);
-
-  const intersects = raycaster.intersectObjects(scene.children, true);
-
-  if (intersects.length > 0) {
-    const obj = intersects[0].object;
-
-    // Check if object has a project linked
-    if (projects[obj.name]) {
-      openProject(obj.name);
-    }
+  if (hits.length > 0) {
+    const obj = findProjectObject(hits[0].object);
+    if (obj) openProject(obj.userData.project);
   }
 });
 
-// Open project panel
+// ================= UI =================
+const titleEl = document.getElementById("projectTitle");
+const descEl = document.getElementById("projectDesc");
+const projectImageEl = document.getElementById("projectImage");
+const panel = document.getElementById("projectPanel");
+const closeBtn = document.getElementById("closeBtn");
+const prevBtn = document.getElementById("prevImage");
+const nextBtn = document.getElementById("nextImage");
+
+let currentImageIndex = 0;
+let activeProjectName = null;
+
+// Show image
+function showImage(index) {
+  const data = projects[activeProjectName];
+  if (!data) return;
+
+  currentImageIndex = (index + data.images.length) % data.images.length;
+  projectImageEl.style.opacity = 0;
+
+  setTimeout(() => {
+    projectImageEl.src = data.images[currentImageIndex];
+    projectImageEl.style.opacity = 1;
+  }, 150);
+
+  const obj = scene.getObjectByProperty("name", activeProjectName);
+  if (obj) {
+    obj.material.map = obj.userData.textures[currentImageIndex];
+    obj.material.needsUpdate = true;
+  }
+}
+
+// Open project
 function openProject(name) {
   const data = projects[name];
+  const overlay = document.getElementById("overlay");
   if (!data) return;
+
+  stopAutoCycle(name);
+
+  activeProjectName = name;
+  currentImageIndex = 0;
 
   titleEl.textContent = data.title;
   descEl.textContent = data.desc;
+  projectImageEl.src = data.images[0];
 
-  panel.style.display = "block";
-
-  // Unlock pointer so user can click buttons
-  controls.unlock();
+  panel.classList.add("active");
+  overlay.classList.add("active");
+  if (controls.isLocked) controls.unlock();
 }
 
-// Close button
+// Close panel
 closeBtn.addEventListener("click", () => {
-  panel.style.display = "none";
+  panel.classList.remove("active");
+  overlay.classList.remove("active");
 
-  // Lock pointer again for movement
-  controls.lock();
-});
-
-function moveTo(index){
-  console.log("moving to:", index);
-
-  const target=points[index];
-
-  gsap.to(camera.position, {
-    duration:1,
-    x: target.pos.x,
-    y: target.pos.y,
-    z: target.pos.z,
-  });
-  gsap.to(camera.rotation, {
-    duration:1,
-    x: target.rot.x,
-    y: target.rot.y,
-    z: target.rot.z,
-  });
-
-  currentPoint=index;
-}
-
-//object interaction
-window.addEventListener('click',()=>{
-  if(!controls.isLocked)return;
-  
-  raycaster.setFromCamera(center, camera);
-
-  const intersect=raycaster.intersectObjects(scene.children, true);
-
-    //const obj=intersect[0].object;
-    //console.log("Hit:", obj.name);
-    //openProject(obj.name);
-  if(intersect.length>0){
-    let obj=intersect[0].object;
-    const projectObj=findProjectObject(obj);
-    if(projectObj){
-      openProject(projectObj.userData.project);
-    }
+  if (activeProjectName) {
+    const obj = scene.getObjectByProperty("name", activeProjectName);
+    if (obj) startAutoCycle(obj);
   }
 });
 
-    function findProjectObject(obj){
-      while (obj){
-        if(obj.userData&&obj.userData.project){
-          return obj;
-        }
-        obj=obj.parent;
-      }
-      return null;
-    }
+overlay.addEventListener("click", () => {
+  panel.classList.remove("active");
+  overlay.classList.remove("active");
 
-//tutorial logic
-startBtn.addEventListener('click', () => {
-  tutorial.style.display = 'none';
-  controls.lock();
+  if (activeProjectName) {
+    const obj = scene.getObjectByProperty("name", activeProjectName);
+    if (obj) startAutoCycle(obj);
+  }
 });
 
-//resize
-window.addEventListener('resize',()=>{
-  camera.aspect=window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+// Buttons
+prevBtn.addEventListener("click", () => showImage(currentImageIndex - 1));
+nextBtn.addEventListener("click", () => showImage(currentImageIndex + 1));
+
+// ================= MOVEMENT =================
+const points = [
+  { pos: new THREE.Vector3(-2, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(-0.65, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(0.8, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(2.5, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(4.15, 0.5, 2.3), rot: new THREE.Euler(0, 0, 0) }
+];
+
+let currentPoint = 0;
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight") moveTo((currentPoint + 1) % points.length);
+  if (e.key === "ArrowLeft") moveTo((currentPoint - 1 + points.length) % points.length);
 });
 
-//animater
-function animate() {
-  requestAnimationFrame(animate);
-  renderer.render(scene, camera);
-  //console.log(camera.rotation);
+function moveTo(i) {
+  const t = points[i];
+  gsap.to(camera.position, { duration: 1, ...t.pos });
+  gsap.to(camera.rotation, { duration: 1, ...t.rot });
+  currentPoint = i;
 }
 
+// ================= TUTORIAL =================
+const startBtn = document.getElementById("startBtn");
+const tutorial = document.getElementById("tutorial");
+
+if (startBtn && tutorial) {
+  startBtn.addEventListener('click', () => {
+    tutorial.style.display = 'none';
+    controls.lock();
+  });
+}
+
+// ================= RESIZE =================
+window.addEventListener('resize', () => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+});
+
+// ================= LOOP =================
+function animate() {
+  requestAnimationFrame(animate);
+  composer.render();
+}
 animate();
