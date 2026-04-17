@@ -73,6 +73,29 @@ const projects = {
   }
 };
 
+// ================= OUTLINE =================
+function addOutline(mesh, glow = 3, size = 1.03) {
+  const geo = mesh.geometry.clone();
+  geo.computeBoundingBox();
+
+  const center = new THREE.Vector3();
+  geo.boundingBox.getCenter(center);
+  geo.translate(-center.x, -center.y, -center.z);
+
+  const outlineMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffff,
+    side: THREE.BackSide
+  });
+
+  outlineMat.color.multiplyScalar(glow);
+
+  const outline = new THREE.Mesh(geo, outlineMat);
+  outline.scale.set(size, size, size);
+  outline.position.copy(center);
+
+  mesh.add(outline);
+}
+
 // ================= AUTO CYCLE =================
 const autoCycles = {};
 
@@ -112,26 +135,33 @@ loader.load('/ruins.glb', (gltf) => {
 
     // PROJECTS
     const project = projects[child.name];
-        if (!project) return;
-    
-        if (!project.images || project.images.length === 0) return;
-    
-        child.userData.project = child.name;
-    
-        // Load textures
-        const textures = project.images.map(img => {
-          const tex = textureLoader.load(img);
-          tex.flipY = false;
-          tex.colorSpace = THREE.SRGBColorSpace;
-          return tex;
-        });
-    
-        child.userData.textures = textures;
-    
-        // Apply first texture
-        child.material = new THREE.MeshStandardMaterial({
-          map: textures[0]
-        });
+    if (!project) return;
+
+    if (!project.images || project.images.length === 0) return;
+
+    child.userData.project = child.name;
+
+    // Load textures
+    const textures = project.images.map(img => {
+      const tex = textureLoader.load(img);
+      tex.flipY = false;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    });
+
+    child.userData.textures = textures;
+
+    // Apply first texture
+    child.material = new THREE.MeshStandardMaterial({
+      map: textures[0]
+    });
+
+    // Glow
+    addOutline(
+      child,
+      project.glow || 3,
+      project.outlineSize || 1.03
+    );
 
     if (textures.length > 1) startAutoCycle(child);
   });
@@ -139,12 +169,17 @@ loader.load('/ruins.glb', (gltf) => {
   scene.add(model);
 
   // ================= LOGIN =================
+  tutorial.classList.add("hidden");
   initLogin({
     sdCard,
     sdCardTarget,
     controls,
     startMainExperience: () => {
       loginFinished = true;
+
+      const tutorial = document.getElementById("tutorial");
+      tutorial.classList.remove("hidden"); // show tutorial AFTER login
+
 
       moveTo(0); // go to first point after login
     }
@@ -154,14 +189,19 @@ loader.load('/ruins.glb', (gltf) => {
 // ================= CONTROLS =================
 const controls = new PointerLockControls(camera, document.body);
 document.addEventListener('click', (e) => {
-  // ❌ don't lock if panel is open
-  if (panel.classList.contains("active")) return;
+  if (!loginFinished) return;
 
-  // ❌ don't lock if clicking UI elements
+  if(panel.classList.contains("activ")) return //prevent conflicts
+
+  // ignore UI
+  if (e.target.closest("#tutorial")) return;
   if (e.target.closest("#projectPanel")) return;
   if (e.target.closest("#overlay")) return;
 
-  controls.lock();
+  // ONLY lock if not already locked
+  if (!controls.isLocked) {
+    controls.lock();
+  }
 });
 
 // ================= RAYCAST =================
@@ -190,15 +230,15 @@ window.addEventListener('click', () => {
 
 // ================= MOVEMENT (YOUR SYSTEM) =================
 const points = [
-  { pos: new THREE.Vector3(-2,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
-  { pos: new THREE.Vector3(-0.65,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
-  { pos: new THREE.Vector3(0.8,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
-  { pos: new THREE.Vector3(2.5,-1,2.3), rot: new THREE.Euler(0,-1.55,0) },
-  { pos: new THREE.Vector3(4.15,0.5,2.3), rot: new THREE.Euler(0,0,0) },
-  { pos: new THREE.Vector3(4.15,0.5,0.1), rot: new THREE.Euler(0,1.55,0) },
-  { pos: new THREE.Vector3(2,0.5,0.1), rot: new THREE.Euler(0,1.55,0) },
-  { pos: new THREE.Vector3(-2,0.5,0.1), rot: new THREE.Euler(0,-1.55,0) },
-  { pos: new THREE.Vector3(-2,0.5,0.1), rot: new THREE.Euler(1.55,-0.6,1.55) }
+  { pos: new THREE.Vector3(-2, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(-0.65, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(0.8, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(2.5, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(4.15, 0.5, 2.3), rot: new THREE.Euler(0, 0, 0) },
+  { pos: new THREE.Vector3(4.15, 0.5, 0.1), rot: new THREE.Euler(0, 1.55, 0) },
+  { pos: new THREE.Vector3(2, 0.5, 0.1), rot: new THREE.Euler(0, 1.55, 0) },
+  { pos: new THREE.Vector3(-2, 0.5, 0.1), rot: new THREE.Euler(0, -1.55, 0) },
+  { pos: new THREE.Vector3(-2, 0.5, 0.1), rot: new THREE.Euler(1.55, -0.6, 1.55) }
 ];
 
 let currentPoint = 0;
@@ -221,7 +261,7 @@ function moveTo(i) {
   const t = points[i];
 
   // unlock during animation (important)
-  if (controls.isLocked) controls.unlock();
+  //if (controls.isLocked) controls.unlock();
 
   // move position
   gsap.to(camera.position, {
@@ -254,6 +294,8 @@ const titleEl = document.getElementById("projectTitle");
 const descEl = document.getElementById("projectDesc");
 const projectImageEl = document.getElementById("projectImage");
 const panel = document.getElementById("projectPanel");
+const overlay = document.getElementById("overlay");
+
 const closeBtn = document.getElementById("closeBtn");
 const prevBtn = document.getElementById("prevImage");
 const nextBtn = document.getElementById("nextImage");
@@ -261,12 +303,13 @@ const nextBtn = document.getElementById("nextImage");
 let currentImageIndex = 0;
 let activeProjectName = null;
 
-// Show image
+//  SHOW IMAGE 
 function showImage(index) {
   const data = projects[activeProjectName];
   if (!data) return;
 
   currentImageIndex = (index + data.images.length) % data.images.length;
+
   projectImageEl.style.opacity = 0;
 
   setTimeout(() => {
@@ -281,10 +324,9 @@ function showImage(index) {
   }
 }
 
-// Open project
+//  OPEN
 function openProject(name) {
   const data = projects[name];
-  const overlay = document.getElementById("overlay");
   if (!data) return;
 
   stopAutoCycle(name);
@@ -298,11 +340,15 @@ function openProject(name) {
 
   panel.classList.add("active");
   overlay.classList.add("active");
+
+  // unlock so user can interact with UI
   if (controls.isLocked) controls.unlock();
 }
 
-// Close panel
-closeBtn.addEventListener("click", () => {
+//  CLOSE 
+function closeProjectPanel(e) {
+  if (e) e.stopPropagation(); // 🔥 prevent global click conflicts
+
   panel.classList.remove("active");
   overlay.classList.remove("active");
 
@@ -310,21 +356,42 @@ closeBtn.addEventListener("click", () => {
     const obj = scene.getObjectByProperty("name", activeProjectName);
     if (obj) startAutoCycle(obj);
   }
+
+  // 🔥 relock immediately (no extra click needed)
+  setTimeout(() => {
+    controls.lock();
+  }, 50);
+}
+
+//  EVENTS
+closeBtn.addEventListener("click", closeProjectPanel);
+overlay.addEventListener("click", closeProjectPanel);
+
+prevBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  showImage(currentImageIndex - 1);
 });
 
-overlay.addEventListener("click", () => {
-  panel.classList.remove("active");
-  overlay.classList.remove("active");
-
-  if (activeProjectName) {
-    const obj = scene.getObjectByProperty("name", activeProjectName);
-    if (obj) startAutoCycle(obj);
-  }
+nextBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  showImage(currentImageIndex + 1);
 });
+// ================= TUTORIAL =================
+const startBtn = document.getElementById("startBtn");
+const tutorial = document.getElementById("tutorial");
 
-// Buttons
-prevBtn.addEventListener("click", () => showImage(currentImageIndex - 1));
-nextBtn.addEventListener("click", () => showImage(currentImageIndex + 1));
+if (startBtn && tutorial) {
+  startBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+
+    tutorial.classList.add("hidden");
+
+    // lock AFTER UI update (important)
+    requestAnimationFrame(() => {
+      controls.lock();
+    });
+  });
+}
 
 // ================= LOOP =================
 function animate() {
