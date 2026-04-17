@@ -49,7 +49,7 @@ export function initLogin({
       loginUI.style.pointerEvents = "none";
     }, 300);
 
-    // animate SD card
+/*    // animate SD card
     const targetPos = sdCardTarget.getWorldPosition(new THREE.Vector3());
 
     gsap.to(sdCard.position, {
@@ -68,7 +68,7 @@ export function initLogin({
       yoyo: true,
       repeat: 1
     });
-
+*/
     // continue after animation
     setTimeout(() => {
       startMainExperience();

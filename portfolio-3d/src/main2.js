@@ -7,12 +7,11 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import gsap from "gsap";
 
 import { initLogin } from "./login.js";
+import { mix } from 'three/src/nodes/TSL.js';
 
-// ================= SCENE =================
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x222222);
-const textureLoader = new THREE.TextureLoader();
-let loginFinished = false;
+// ================= DOM REFERENCES =================
+const panel = document.getElementById("projectPanel");
+const overlay = document.getElementById("overlay");
 
 // ================= CAMERA =================
 const camera = new THREE.PerspectiveCamera(
@@ -24,11 +23,38 @@ const camera = new THREE.PerspectiveCamera(
 
 camera.position.set(-2, -1, 2.3);
 
+// ================= SCENE =================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x222222);
+const textureLoader = new THREE.TextureLoader();
+const controls = new PointerLockControls(camera, document.body);
+let loginFinished = false;
+let sdCard=null;
+let sdCardTarget=null;
+
+
 // ================= RENDERER =================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
+
+// ================= CONTROLS =================
+document.addEventListener('click', (e) => {
+  if (!loginFinished) return;
+
+  if(panel.classList.contains("activ")) return //prevent conflicts
+
+  // ignore UI
+  if (e.target.closest("#tutorial")) return;
+  if (e.target.closest("#projectPanel")) return;
+  if (e.target.closest("#overlay")) return;
+
+  // ONLY lock if not already locked
+  if (!controls.isLocked) {
+    controls.lock();
+  }
+});
 
 // ================= POST =================
 const composer = new EffectComposer(renderer);
@@ -116,32 +142,42 @@ function stopAutoCycle(name) {
     delete autoCycles[name];
   }
 }
+
 // ================= MODEL =================
 const loader = new GLTFLoader();
 
-let sdCard = null;
-let sdCardTarget = null;
+let mixer = null;
+let insertAction = null;
+let modelReady = false;
 
 loader.load('/ruins.glb', (gltf) => {
   const model = gltf.scene;
   model.scale.set(0.1, 0.1, 0.1);
 
+  scene.add(model); // REQUIRED
+
+  mixer = new THREE.AnimationMixer(model);
+
+  const clip = THREE.AnimationClip.findByName(
+    gltf.animations,
+    "InsertSd"
+  );
+
+  if (clip) {
+    insertAction = mixer.clipAction(clip);
+    insertAction.setLoop(THREE.LoopOnce);
+    insertAction.clampWhenFinished = true;
+  }
+
   model.traverse((child) => {
     if (!child.isMesh) return;
 
-    // LOGIN OBJECTS
     if (child.name === "sd_card") sdCard = child;
     if (child.name === "sd_card_target") sdCardTarget = child;
 
-    // PROJECTS
     const project = projects[child.name];
     if (!project) return;
 
-    if (!project.images || project.images.length === 0) return;
-
-    child.userData.project = child.name;
-
-    // Load textures
     const textures = project.images.map(img => {
       const tex = textureLoader.load(img);
       tex.flipY = false;
@@ -149,58 +185,70 @@ loader.load('/ruins.glb', (gltf) => {
       return tex;
     });
 
+    child.userData.project = child.name;
     child.userData.textures = textures;
 
-    // Apply first texture
     child.material = new THREE.MeshStandardMaterial({
       map: textures[0]
     });
 
-    // Glow
-    addOutline(
-      child,
-      project.glow || 3,
-      project.outlineSize || 1.03
-    );
+    addOutline(child, project.glow, project.outlineSize);
 
     if (textures.length > 1) startAutoCycle(child);
   });
 
-  scene.add(model);
+  modelReady = true;
+});
+
+// ================= TUTORIAL =================
+const tutorial = document.getElementById("tutorial");
+const startBtn = document.getElementById("startBtn");
+
+if (startBtn) {
+  startBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // IMPORTANT
+
+    tutorial.classList.add("hidden");
+
+    // unlock pointer lock safely
+    if (controls && controls.isLocked) {
+      controls.unlock();
+    }
+
+    // re-lock after UI update
+    requestAnimationFrame(() => {
+      controls.lock();
+    });
+  });
+}
 
   // ================= LOGIN =================
   tutorial.classList.add("hidden");
   initLogin({
-    sdCard,
-    sdCardTarget,
-    controls,
-    startMainExperience: () => {
-      loginFinished = true;
+  sdCard,
+  sdCardTarget,
+  controls,
 
-      const tutorial = document.getElementById("tutorial");
-      tutorial.classList.remove("hidden"); // show tutorial AFTER login
+  startMainExperience: () => {
+    loginFinished = true;
 
+    const wait = setInterval(() => {
+      if (!modelReady || !insertAction) return;
 
-      moveTo(0); // go to first point after login
-    }
-  });
-});
+      clearInterval(wait);
 
-// ================= CONTROLS =================
-const controls = new PointerLockControls(camera, document.body);
-document.addEventListener('click', (e) => {
-  if (!loginFinished) return;
+      insertAction.reset();
+      insertAction.play();
 
-  if(panel.classList.contains("activ")) return //prevent conflicts
+      const duration = insertAction.getClip().duration || 1.5;
 
-  // ignore UI
-  if (e.target.closest("#tutorial")) return;
-  if (e.target.closest("#projectPanel")) return;
-  if (e.target.closest("#overlay")) return;
+      setTimeout(() => {
+        tutorial.classList.remove("hidden");
+        moveTo(0);
+      }, duration * 1000);
 
-  // ONLY lock if not already locked
-  if (!controls.isLocked) {
-    controls.lock();
+    }, 50);
   }
 });
 
@@ -260,9 +308,6 @@ document.addEventListener("keydown", (e) => {
 function moveTo(i) {
   const t = points[i];
 
-  // unlock during animation (important)
-  //if (controls.isLocked) controls.unlock();
-
   // move position
   gsap.to(camera.position, {
     x: t.pos.x,
@@ -293,8 +338,6 @@ function moveTo(i) {
 const titleEl = document.getElementById("projectTitle");
 const descEl = document.getElementById("projectDesc");
 const projectImageEl = document.getElementById("projectImage");
-const panel = document.getElementById("projectPanel");
-const overlay = document.getElementById("overlay");
 
 const closeBtn = document.getElementById("closeBtn");
 const prevBtn = document.getElementById("prevImage");
@@ -376,28 +419,19 @@ nextBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   showImage(currentImageIndex + 1);
 });
-// ================= TUTORIAL =================
-const startBtn = document.getElementById("startBtn");
-const tutorial = document.getElementById("tutorial");
-
-if (startBtn && tutorial) {
-  startBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-
-    tutorial.classList.add("hidden");
-
-    // lock AFTER UI update (important)
-    requestAnimationFrame(() => {
-      controls.lock();
-    });
-  });
-}
 
 // ================= LOOP =================
+const clock = new THREE.Clock();
+
 function animate() {
   requestAnimationFrame(animate);
+
+  const delta = clock.getDelta();
+  if (mixer) mixer.update(delta);
+
   composer.render();
 }
+
 animate();
 
 // ================= RESIZE =================

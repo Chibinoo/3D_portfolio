@@ -45,7 +45,8 @@ canvas {
 .login-box {
   background: rgba(0,0,0,0.8);
   padding: 20px;
-  border-radius: 12px;
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
 }
 
 /* TUTORIAL */
@@ -55,10 +56,11 @@ canvas {
   left: 50vw;
   transform: translate(-50%, -50%);
 
-  background: rgba(70,131,180,0.9);
+  background: rgba(0,0,0,0.8);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
   color: white;
-  opacity: 1;
-
+  
   padding: 20px;
   z-index: 9000;
 
@@ -72,6 +74,7 @@ canvas {
 
 #tutorial.hidden {
   opacity: 0;
+  display: none;
   pointer-events: none;
   transition: opacity 0.3s ease;
 }
