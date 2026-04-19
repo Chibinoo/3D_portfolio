@@ -29,8 +29,8 @@ scene.background = new THREE.Color(0x222222);
 const textureLoader = new THREE.TextureLoader();
 const controls = new PointerLockControls(camera, document.body);
 let loginFinished = false;
-let sdCard=null;
-let sdCardTarget=null;
+let sdCard = null;
+let sdCardTarget = null;
 
 
 // ================= RENDERER =================
@@ -43,7 +43,7 @@ document.body.appendChild(renderer.domElement);
 document.addEventListener('click', (e) => {
   if (!loginFinished) return;
 
-  if(panel.classList.contains("activ")) return //prevent conflicts
+  if (panel.classList.contains("active")) return //prevent conflicts
 
   // ignore UI
   if (e.target.closest("#tutorial")) return;
@@ -223,9 +223,9 @@ if (startBtn) {
   });
 }
 
-  // ================= LOGIN =================
-  tutorial.classList.add("hidden");
-  initLogin({
+// ================= LOGIN =================
+tutorial.classList.add("hidden");
+initLogin({
   sdCard,
   sdCardTarget,
   controls,
@@ -278,15 +278,50 @@ window.addEventListener('click', () => {
 
 // ================= MOVEMENT (YOUR SYSTEM) =================
 const points = [
-  { pos: new THREE.Vector3(-2, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(-0.65, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(0.8, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(2.5, -1, 2.3), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(4.15, 0.5, 2.3), rot: new THREE.Euler(0, 0, 0) },
-  { pos: new THREE.Vector3(4.15, 0.5, 0.1), rot: new THREE.Euler(0, 1.55, 0) },
-  { pos: new THREE.Vector3(2, 0.5, 0.1), rot: new THREE.Euler(0, 1.55, 0) },
-  { pos: new THREE.Vector3(-2, 0.5, 0.1), rot: new THREE.Euler(0, -1.55, 0) },
-  { pos: new THREE.Vector3(-2, 0.5, 0.1), rot: new THREE.Euler(1.55, -0.6, 1.55) }
+  {
+    pos: new THREE.Vector3(-2.00, -1.00, 2.30),
+    look: new THREE.Vector3(3.00, -1.09, 2.37)
+  },
+  {
+    pos: new THREE.Vector3(-0.65, -1.00, 2.30),
+    look: new THREE.Vector3(4.35, -1.14, 2.29)
+  },
+  {
+    pos: new THREE.Vector3(0.80, -1.00, 2.30),
+    look: new THREE.Vector3(5.80, -0.86, 2.32)
+  },
+  {
+    pos: new THREE.Vector3(2.50, -1.00, 2.30),
+    look: new THREE.Vector3(6.93, 1.31, 2.46)
+  },
+  {
+    pos: new THREE.Vector3(4.15, 0.50, 2.30),
+    look: new THREE.Vector3(4.15, 0.50, -2.70)
+  },
+  {
+    pos: new THREE.Vector3(4.15, 0.50, 0.10),
+    look: new THREE.Vector3(-0.84, 0.20, 0.23)
+  },
+  {
+    pos: new THREE.Vector3(2.00, 0.50, 0.10),
+    look: new THREE.Vector3(-3.00, 0.50, 0.00)
+  },
+  { 
+    pos: new THREE.Vector3(0, 0.5, 0.1),
+    look: new THREE.Vector3(-3.00, 0.50, -0.00) 
+  },
+  {
+    pos: new THREE.Vector3(-2.00, 0.50, 0.10),
+    look: new THREE.Vector3(3.00, 0.38, 0.06)
+  },
+  {
+    pos: new THREE.Vector3(-2.00, 0.50, 0.10),
+    look: new THREE.Vector3(0.95, 4.53, 0.25)
+  },
+  {
+    pos: new THREE.Vector3(-5.00, 0.25, 1.50),
+    look: new THREE.Vector3(-0.19, -0.19, 0.19)
+  }
 ];
 
 let currentPoint = 0;
@@ -305,34 +340,37 @@ document.addEventListener("keydown", (e) => {
 });
 
 // MOVE FUNCTION
+const currentLookTarget = new THREE.Vector3();
+
 function moveTo(i) {
   const t = points[i];
 
-  // move position
   gsap.to(camera.position, {
     x: t.pos.x,
     y: t.pos.y,
     z: t.pos.z,
-    duration: 1.2,
-    ease: "power2.inOut"
+    duration: 1.4,
+    ease: "power2.inOut",
+    onUpdate: () => {
+      camera.lookAt(currentLookTarget);
+    }
   });
 
-  // rotate camera directly (works in your version)
-  gsap.to(camera.rotation, {
-    x: t.rot.x,
-    y: t.rot.y,
-    z: t.rot.z,
+  gsap.to(currentLookTarget, {
+    x: t.look.x,
+    y: t.look.y,
+    z: t.look.z,
     duration: 1.2,
     ease: "power2.inOut"
   });
 
   currentPoint = i;
-
-  // relock AFTER movement (must be user-triggered → so delay is fine here)
-  setTimeout(() => {
-    // ❗ do NOT force lock → just allow next click to lock
-  }, 1200);
 }
+
+// relock AFTER movement (must be user-triggered → so delay is fine here)
+setTimeout(() => {
+  // ❗ do NOT force lock → just allow next click to lock
+}, 1200);
 
 // ================= PROJECT PANEL =================
 const titleEl = document.getElementById("projectTitle");
@@ -420,6 +458,22 @@ nextBtn.addEventListener("click", (e) => {
   showImage(currentImageIndex + 1);
 });
 
+// ================= PRINT CAM POSITION =================
+document.addEventListener("keydown", (e) => {
+  if (e.key === "p") {
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+
+    const look = camera.position.clone().add(dir.multiplyScalar(5));
+
+    console.log(`
+{
+  pos: new THREE.Vector3(${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)}),
+  look: new THREE.Vector3(${look.x.toFixed(2)}, ${look.y.toFixed(2)}, ${look.z.toFixed(2)})
+},`);
+  }
+});
+
 // ================= LOOP =================
 const clock = new THREE.Clock();
 
@@ -431,7 +485,6 @@ function animate() {
 
   composer.render();
 }
-
 animate();
 
 // ================= RESIZE =================

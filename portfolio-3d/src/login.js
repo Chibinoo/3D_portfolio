@@ -36,8 +36,6 @@ export function initLogin({
   }
 
   function unlock() {
-    if (!sdCard || !sdCardTarget) return;
-
     // stop pointer lock if active
     if (controls.isLocked) controls.unlock();
 
@@ -49,26 +47,6 @@ export function initLogin({
       loginUI.style.pointerEvents = "none";
     }, 300);
 
-/*    // animate SD card
-    const targetPos = sdCardTarget.getWorldPosition(new THREE.Vector3());
-
-    gsap.to(sdCard.position, {
-      x: targetPos.x,
-      y: targetPos.y,
-      z: targetPos.z,
-      duration: 1.5,
-      ease: "power2.inOut"
-    });
-
-    gsap.to(sdCard.scale, {
-      x: 1.2,
-      y: 1.2,
-      z: 1.2,
-      duration: 0.4,
-      yoyo: true,
-      repeat: 1
-    });
-*/
     // continue after animation
     setTimeout(() => {
       startMainExperience();
