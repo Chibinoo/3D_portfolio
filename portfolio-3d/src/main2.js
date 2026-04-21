@@ -85,7 +85,7 @@ const projects = {
       "/textures/poster1_textures.jpg",
       "/textures/poster2_textures.jpg"
     ],
-    glow: 4,
+    glow: 2,
     outlineSize: 1.02,
   },
   key_card001: {
@@ -94,9 +94,36 @@ const projects = {
     images: [
       "/textures/keycard_textures1.jpg"
     ],
-    glow: 2,
+    glow: 1.5,
     outlineSize: 1,
-  }
+  },
+  Hooodie:{
+    title:"thats a hoodie",
+    desc:"it keeps you warm",
+    images:[
+      "/textures/hoodie_textures.jpg"
+    ],
+    glow:1,
+    outlineSize:1.05,
+  },
+  screen:{
+    title: "thats an app",
+    desc: "helps with mental health",
+    images:[
+      "/textures/phone_texture.jpg"
+    ],
+    /*glow:1,
+    outlineSize:1.05,*/
+  },
+  phone:{
+    title: "thats an app",
+    desc: "helps with mental health",
+    images:[
+      ""
+    ],
+    glow:2,
+    outlineSize:1.05,
+  },
 };
 
 // ================= OUTLINE =================
@@ -278,50 +305,19 @@ window.addEventListener('click', () => {
 
 // ================= MOVEMENT (YOUR SYSTEM) =================
 const points = [
-  {
-    pos: new THREE.Vector3(-2.00, -1.00, 2.30),
-    look: new THREE.Vector3(3.00, -1.09, 2.37)
-  },
-  {
-    pos: new THREE.Vector3(-0.65, -1.00, 2.30),
-    look: new THREE.Vector3(4.35, -1.14, 2.29)
-  },
-  {
-    pos: new THREE.Vector3(0.80, -1.00, 2.30),
-    look: new THREE.Vector3(5.80, -0.86, 2.32)
-  },
-  {
-    pos: new THREE.Vector3(2.50, -1.00, 2.30),
-    look: new THREE.Vector3(6.93, 1.31, 2.46)
-  },
-  {
-    pos: new THREE.Vector3(4.15, 0.50, 2.30),
-    look: new THREE.Vector3(4.15, 0.50, -2.70)
-  },
-  {
-    pos: new THREE.Vector3(4.15, 0.50, 0.10),
-    look: new THREE.Vector3(-0.84, 0.20, 0.23)
-  },
-  {
-    pos: new THREE.Vector3(2.00, 0.50, 0.10),
-    look: new THREE.Vector3(-3.00, 0.50, 0.00)
-  },
-  { 
-    pos: new THREE.Vector3(0, 0.5, 0.1),
-    look: new THREE.Vector3(-3.00, 0.50, -0.00) 
-  },
-  {
-    pos: new THREE.Vector3(-2.00, 0.50, 0.10),
-    look: new THREE.Vector3(3.00, 0.38, 0.06)
-  },
-  {
-    pos: new THREE.Vector3(-2.00, 0.50, 0.10),
-    look: new THREE.Vector3(0.95, 4.53, 0.25)
-  },
-  {
-    pos: new THREE.Vector3(-5.00, 0.25, 1.50),
-    look: new THREE.Vector3(-0.19, -0.19, 0.19)
-  }
+  {pos: new THREE.Vector3(-2.00, -1.00, 2.30),look: new THREE.Vector3(3.00, -1.09, 2.37)},//start
+  {pos: new THREE.Vector3(-0.95, -1.00, 2.30),look: new THREE.Vector3(4.35, -1.14, 2.29)},//key card
+  {pos: new THREE.Vector3(0.60, -1.00, 2.30),look: new THREE.Vector3(5.80, -0.86, 2.32)},//poster
+  {pos: new THREE.Vector3(2.50, -1.00, 2.30),look: new THREE.Vector3(6.93, 1.31, 2.46)},//stairs
+  {pos: new THREE.Vector3(4.15, 0.50, 2.30),look: new THREE.Vector3(4.15, 0.50, -2.70)},//coridor
+  {pos: new THREE.Vector3(4.15, 0.50, 2),look: new THREE.Vector3(4.15, 0.50, -2.70)},//hoodie
+  {pos: new THREE.Vector3(4.15, 0.50, 0.50),look: new THREE.Vector3(4.15, 0.50, -2.70)},//phone
+  {pos: new THREE.Vector3(4.15, 0.50, 0.10),look: new THREE.Vector3(-0.84, 0.20, 0.23)},//coridor end
+  {pos: new THREE.Vector3(2.00, 0.50, 0.10),look: new THREE.Vector3(-3.00, 0.50, 0.00)},//halle halfe
+  {pos: new THREE.Vector3(0, 0.5, 0.1),look: new THREE.Vector3(-3.00, 0.50, -0.00)},//hall end 
+  {pos: new THREE.Vector3(-2.00, 0.50, 0.10),look: new THREE.Vector3(3.00, 0.38, 0.06)},//dome
+  {pos: new THREE.Vector3(-2.00, 0.50, 0.10),look: new THREE.Vector3(0.95, 4.53, 0.25)},//dome up
+  {pos: new THREE.Vector3(-5.00, 0.25, 1.50),look: new THREE.Vector3(-0.19, -0.19, 0.19)}//overview
 ];
 
 let currentPoint = 0;
