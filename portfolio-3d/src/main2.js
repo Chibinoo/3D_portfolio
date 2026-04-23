@@ -126,6 +126,16 @@ const projects = {
     glow:2,
     outlineSize:1.05,
   },
+  book:{
+    title:"thats me too",
+    desc:" thats a lot to read",
+    images:[
+      "/textures/about me 2.png",
+      "/textures/about me.png"
+    ],
+    glow:2,
+    outlineSize:1.05,
+  }
 };
 
 // ================= OUTLINE =================
