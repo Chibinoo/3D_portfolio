@@ -12,6 +12,8 @@ import { mix } from 'three/src/nodes/TSL.js';
 // ================= DOM REFERENCES =================
 const panel = document.getElementById("projectPanel");
 const overlay = document.getElementById("overlay");
+const hoverLabel = document.getElementById("hoverLabel");
+let lastHovered=null;
 
 // ================= CAMERA =================
 const camera = new THREE.PerspectiveCamera(
@@ -473,11 +475,44 @@ document.addEventListener("keydown", (e) => {
 // ================= LOOP =================
 const clock = new THREE.Clock();
 
+function updateHoverLabel() {
+  if (!controls.isLocked) {
+    hoverLabel.style.opacity = 0;
+    lastHovered = null;
+    return;
+  }
+
+  raycaster.setFromCamera(center, camera);
+  const hits = raycaster.intersectObjects(scene.children, true);
+
+  if (hits.length > 0) {
+    const obj = findProjectObject(hits[0].object);
+
+    if (obj && obj.userData?.project) {
+      if (lastHovered === obj) return;
+
+      lastHovered = obj;
+
+      const data = projects[obj.userData.project];
+
+      hoverLabel.textContent = data?.title || obj.name;
+      hoverLabel.style.opacity = 1;
+      return;
+    }
+  }
+
+  // nothing hit → hide cleanly
+  lastHovered = null;
+  hoverLabel.style.opacity = 0;
+}
+
 function animate() {
   requestAnimationFrame(animate);
 
   const delta = clock.getDelta();
   if (mixer) mixer.update(delta);
+
+  updateHoverLabel();
 
   composer.render();
 }
