@@ -93,6 +93,7 @@ canvas {
 
   width: 70%;
   max-width: 900px;
+  max-height: 85vh;
 
   background: rgba(0,0,0,0.8);
   border-radius: 20px;
@@ -103,6 +104,8 @@ canvas {
 
   transition: all 0.3s ease;
   z-index: 1000;
+
+  overflow: hidden; /* prevents image overflow */
 }
 
 #projectPanel.active {
@@ -111,6 +114,7 @@ canvas {
   transform: translate(-50%, -50%) scale(1);
 }
 
+/* ================= CONTENT LAYOUT ================= */
 .panel-content {
   display: flex;
   height: 100%;
@@ -118,26 +122,41 @@ canvas {
   gap: 20px;
 }
 
+/* ================= IMAGE SIDE ================= */
 .image-container {
   flex: 1.2;
+
+  display: flex;              /* 🔥 center image */
+  align-items: center;
+  justify-content: center;
+
   overflow: hidden;
   border-radius: 15px;
 }
 
+/* ================= IMAGE FIX (IMPORTANT PART) ================= */
 #projectImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: auto;        /* 🔥 natural width */
+  max-width: 100%;    /* 🔥 shrink if too big */
+  height: auto;       /* 🔥 keep aspect ratio */
+
+  max-height: 70vh;   /* prevents huge vertical overflow */
+
+  display: block;
 }
 
+/* ================= TEXT SIDE ================= */
 .text-container {
   flex: 1;
+
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+
   color: white;
 }
 
+/* ================= BUTTONS ================= */
 .buttons {
   display: flex;
   gap: 10px;

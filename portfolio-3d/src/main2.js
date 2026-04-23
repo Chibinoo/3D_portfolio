@@ -135,6 +135,16 @@ const projects = {
     ],
     glow:2,
     outlineSize:1.05,
+  },
+  deck:{
+    title: "thats a skateboard",
+    desc: "its fun",
+    images:[
+    "/textures/skateboard_back.png",
+    "/textures/skateboard_front.png"
+    ],
+    glow:1.5,
+    outlineSize:0.75,
   }
 };
 
@@ -402,7 +412,8 @@ function showImage(index) {
   projectImageEl.style.opacity = 0;
 
   setTimeout(() => {
-    projectImageEl.src = data.images[currentImageIndex];
+    const img = data.images[currentImageIndex];
+    projectImageEl.src = typeof img === "string" ? img : img.url;
     projectImageEl.style.opacity = 1;
   }, 150);
 
@@ -425,12 +436,13 @@ function openProject(name) {
 
   titleEl.textContent = data.title;
   descEl.textContent = data.desc;
-  projectImageEl.src = data.images[0];
+
+  const firstImg = data.images[0];
+  projectImageEl.src = typeof firstImg === "string" ? firstImg : firstImg.url;
 
   panel.classList.add("active");
   overlay.classList.add("active");
 
-  // unlock so user can interact with UI
   if (controls.isLocked) controls.unlock();
 }
 
