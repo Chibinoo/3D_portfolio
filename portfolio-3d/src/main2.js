@@ -7,61 +7,43 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import gsap from "gsap";
 
 import { initLogin } from "./login.js";
-import { mix } from 'three/src/nodes/TSL.js';
 
-// ================= DOM REFERENCES =================
+// ================= OPTIMIZATION: CACHES =================
+const interactables = [];
+const projectObjects = {};
+
+// ================= DOM =================
 const panel = document.getElementById("projectPanel");
 const overlay = document.getElementById("overlay");
 const hoverLabel = document.getElementById("hoverLabel");
-let lastHovered=null;
 
 // ================= CAMERA =================
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(-2, -1, 2.3);
 
 // ================= SCENE =================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x222222);
+
 const textureLoader = new THREE.TextureLoader();
 const controls = new PointerLockControls(camera, document.body);
+
 let loginFinished = false;
 let sdCard = null;
 let sdCardTarget = null;
 
-
 // ================= RENDERER =================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+// ✅ OPTIMIZATION: cap pixel ratio
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
-
-// ================= CONTROLS =================
-document.addEventListener('click', (e) => {
-  if (!loginFinished) return;
-
-  if (panel.classList.contains("active")) return //prevent conflicts
-
-  // ignore UI
-  if (e.target.closest("#tutorial")) return;
-  if (e.target.closest("#projectPanel")) return;
-  if (e.target.closest("#overlay")) return;
-
-  // ONLY lock if not already locked
-  if (!controls.isLocked) {
-    controls.lock();
-  }
-});
 
 // ================= POST =================
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-
 composer.addPass(
   new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -73,7 +55,6 @@ composer.addPass(
 
 // ================= LIGHT =================
 scene.add(new THREE.AmbientLight(0xffffff, 1));
-
 const light = new THREE.PointLight(0xffffff, 5);
 light.position.set(-5, 5, 0);
 scene.add(light);
@@ -81,8 +62,8 @@ scene.add(light);
 // ================= PROJECT DATA =================
 const projects = {
   poster1: {
-    title: "Project 2",
-    desc: "A Poster wowie",
+    title: "Posters",
+    desc: "A lot of Posters wowie",
     images: [
       "/textures/poster1_textures.jpg",
       "/textures/poster2_textures.jpg"
@@ -145,6 +126,13 @@ const projects = {
     ],
     glow:1.5,
     outlineSize:0.75,
+  },
+  laptop:{
+    title: "that was coded",
+    desc: "fun littel project",
+    images:[
+      "/textures/code.jpg"
+    ],
   }
 };
 
@@ -157,39 +145,14 @@ function addOutline(mesh, glow = 3, size = 1.03) {
   geo.boundingBox.getCenter(center);
   geo.translate(-center.x, -center.y, -center.z);
 
-  const outlineMat = new THREE.MeshBasicMaterial({
-    color: 0x00ffff,
-    side: THREE.BackSide
-  });
+  const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.BackSide });
+  mat.color.multiplyScalar(glow);
 
-  outlineMat.color.multiplyScalar(glow);
-
-  const outline = new THREE.Mesh(geo, outlineMat);
+  const outline = new THREE.Mesh(geo, mat);
   outline.scale.set(size, size, size);
   outline.position.copy(center);
 
   mesh.add(outline);
-}
-
-// ================= AUTO CYCLE =================
-const autoCycles = {};
-
-function startAutoCycle(obj, delay = 3000) {
-  if (!obj?.userData?.textures) return;
-
-  let i = 0;
-
-  autoCycles[obj.name] = setInterval(() => {
-    i = (i + 1) % obj.userData.textures.length;
-    obj.material.map = obj.userData.textures[i];
-    obj.material.needsUpdate = true;
-  }, delay);
-}
-function stopAutoCycle(name) {
-  if (autoCycles[name]) {
-    clearInterval(autoCycles[name]);
-    delete autoCycles[name];
-  }
 }
 
 // ================= MODEL =================
@@ -202,16 +165,11 @@ let modelReady = false;
 loader.load('/ruins.glb', (gltf) => {
   const model = gltf.scene;
   model.scale.set(0.1, 0.1, 0.1);
-
-  scene.add(model); // REQUIRED
+  scene.add(model);
 
   mixer = new THREE.AnimationMixer(model);
 
-  const clip = THREE.AnimationClip.findByName(
-    gltf.animations,
-    "InsertSd"
-  );
-
+  const clip = THREE.AnimationClip.findByName(gltf.animations, "InsertSd");
   if (clip) {
     insertAction = mixer.clipAction(clip);
     insertAction.setLoop(THREE.LoopOnce);
@@ -221,9 +179,6 @@ loader.load('/ruins.glb', (gltf) => {
   model.traverse((child) => {
     if (!child.isMesh) return;
 
-    if (child.name === "sd_card") sdCard = child;
-    if (child.name === "sd_card_target") sdCardTarget = child;
-
     const project = projects[child.name];
     if (!project) return;
 
@@ -231,19 +186,23 @@ loader.load('/ruins.glb', (gltf) => {
       const tex = textureLoader.load(img);
       tex.flipY = false;
       tex.colorSpace = THREE.SRGBColorSpace;
+
+      // ✅ OPTIMIZATION: anisotropy
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
       return tex;
     });
 
     child.userData.project = child.name;
     child.userData.textures = textures;
 
-    child.material = new THREE.MeshStandardMaterial({
-      map: textures[0]
-    });
+    child.material = new THREE.MeshStandardMaterial({ map: textures[0] });
+
+    // ✅ OPTIMIZATION: cache
+    interactables.push(child);
+    projectObjects[child.name] = child;
 
     addOutline(child, project.glow, project.outlineSize);
-
-    if (textures.length > 1) startAutoCycle(child);
   });
 
   modelReady = true;
@@ -313,18 +272,6 @@ function findProjectObject(obj) {
   return null;
 }
 
-window.addEventListener('click', () => {
-  if (!controls.isLocked) return;
-
-  raycaster.setFromCamera(center, camera);
-  const hits = raycaster.intersectObjects(scene.children, true);
-
-  if (hits.length > 0) {
-    const obj = findProjectObject(hits[0].object);
-    if (obj) openProject(obj.userData.project);
-  }
-});
-
 // ================= MOVEMENT (YOUR SYSTEM) =================
 const points = [
   {pos: new THREE.Vector3(-2.00, -1.00, 2.30),look: new THREE.Vector3(3.00, -1.09, 2.37)},//start
@@ -390,7 +337,65 @@ setTimeout(() => {
   // ❗ do NOT force lock → just allow next click to lock
 }, 1200);
 
+// ================= CLICK =================
+window.addEventListener('click', () => {
+  if (!controls.isLocked) return;
+
+  raycaster.setFromCamera(center, camera);
+
+  // ✅ OPTIMIZATION: only interactables
+  const hits = raycaster.intersectObjects(interactables, true);
+
+  if (hits.length > 0) {
+    const obj = findProjectObject(hits[0].object);
+    if (obj) openProject(obj.userData.project);
+  }
+});
+
+// ================= HOVER LABEL =================
+let lastCheck = 0;
+let lastHovered = null;
+
+function updateHoverLabel() {
+  if (!controls.isLocked) {
+    hoverLabel.style.opacity = 0;
+    lastHovered = null;
+    return;
+  }
+
+  const now = performance.now();
+
+  // ✅ OPTIMIZATION: throttle
+  if (now - lastCheck < 100) return;
+  lastCheck = now;
+
+  raycaster.setFromCamera(center, camera);
+  const hits = raycaster.intersectObjects(interactables, true);
+
+  if (hits.length > 0) {
+    const obj = findProjectObject(hits[0].object);
+
+    if (obj && obj !== lastHovered) {
+      lastHovered = obj;
+
+      const data = projects[obj.userData.project];
+      hoverLabel.textContent = data?.title || obj.name;
+      hoverLabel.style.opacity = 1;
+    }
+
+    return;
+  }
+
+  if (lastHovered !== null) {
+    hoverLabel.style.opacity = 0;
+    lastHovered = null;
+  }
+}
+
 // ================= PROJECT PANEL =================
+let currentImageIndex = 0;
+let activeProjectName = null;
+
 const titleEl = document.getElementById("projectTitle");
 const descEl = document.getElementById("projectDesc");
 const projectImageEl = document.getElementById("projectImage");
@@ -399,46 +404,17 @@ const closeBtn = document.getElementById("closeBtn");
 const prevBtn = document.getElementById("prevImage");
 const nextBtn = document.getElementById("nextImage");
 
-let currentImageIndex = 0;
-let activeProjectName = null;
-
-//  SHOW IMAGE 
-function showImage(index) {
-  const data = projects[activeProjectName];
-  if (!data) return;
-
-  currentImageIndex = (index + data.images.length) % data.images.length;
-
-  projectImageEl.style.opacity = 0;
-
-  setTimeout(() => {
-    const img = data.images[currentImageIndex];
-    projectImageEl.src = typeof img === "string" ? img : img.url;
-    projectImageEl.style.opacity = 1;
-  }, 150);
-
-  const obj = scene.getObjectByProperty("name", activeProjectName);
-  if (obj) {
-    obj.material.map = obj.userData.textures[currentImageIndex];
-    obj.material.needsUpdate = true;
-  }
-}
-
-//  OPEN
+// OPEN
 function openProject(name) {
   const data = projects[name];
   if (!data) return;
-
-  stopAutoCycle(name);
 
   activeProjectName = name;
   currentImageIndex = 0;
 
   titleEl.textContent = data.title;
   descEl.textContent = data.desc;
-
-  const firstImg = data.images[0];
-  projectImageEl.src = typeof firstImg === "string" ? firstImg : firstImg.url;
+  projectImageEl.src = data.images[0];
 
   panel.classList.add("active");
   overlay.classList.add("active");
@@ -446,25 +422,38 @@ function openProject(name) {
   if (controls.isLocked) controls.unlock();
 }
 
-//  CLOSE 
+// CLOSE
 function closeProjectPanel(e) {
-  if (e) e.stopPropagation(); // 🔥 prevent global click conflicts
+  if (e) e.stopPropagation();
 
   panel.classList.remove("active");
   overlay.classList.remove("active");
 
-  if (activeProjectName) {
-    const obj = scene.getObjectByProperty("name", activeProjectName);
-    if (obj) startAutoCycle(obj);
-  }
-
-  // 🔥 relock immediately (no extra click needed)
   setTimeout(() => {
     controls.lock();
   }, 50);
 }
 
-//  EVENTS
+function showImage(index) {
+  if (!activeProjectName) return;
+
+  const data = projects[activeProjectName];
+  if (!data) return;
+
+  currentImageIndex = (index + data.images.length) % data.images.length;
+
+  projectImageEl.src = data.images[currentImageIndex];
+
+  // ✅ use cached object (your optimization)
+  const obj = projectObjects[activeProjectName];
+
+  if (obj) {
+    obj.material.map = obj.userData.textures[currentImageIndex];
+    obj.material.needsUpdate = true;
+  }
+}
+
+// EVENTS
 closeBtn.addEventListener("click", closeProjectPanel);
 overlay.addEventListener("click", closeProjectPanel);
 
@@ -497,42 +486,15 @@ document.addEventListener("keydown", (e) => {
 // ================= LOOP =================
 const clock = new THREE.Clock();
 
-function updateHoverLabel() {
-  if (!controls.isLocked) {
-    hoverLabel.style.opacity = 0;
-    lastHovered = null;
-    return;
-  }
-
-  raycaster.setFromCamera(center, camera);
-  const hits = raycaster.intersectObjects(scene.children, true);
-
-  if (hits.length > 0) {
-    const obj = findProjectObject(hits[0].object);
-
-    if (obj && obj.userData?.project) {
-      if (lastHovered === obj) return;
-
-      lastHovered = obj;
-
-      const data = projects[obj.userData.project];
-
-      hoverLabel.textContent = data?.title || obj.name;
-      hoverLabel.style.opacity = 1;
-      return;
-    }
-  }
-
-  // nothing hit → hide cleanly
-  lastHovered = null;
-  hoverLabel.style.opacity = 0;
-}
-
 function animate() {
   requestAnimationFrame(animate);
 
   const delta = clock.getDelta();
-  if (mixer) mixer.update(delta);
+
+  // ✅ OPTIMIZATION: only update animation when needed
+  if (mixer && insertAction?.isRunning()) {
+    mixer.update(delta);
+  }
 
   updateHoverLabel();
 
