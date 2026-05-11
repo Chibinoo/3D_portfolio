@@ -35,6 +35,10 @@ let sdCardTarget = null;
 // ================= RENDERER =================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1;
+
 // ✅ OPTIMIZATION: cap pixel ratio
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 
@@ -54,7 +58,7 @@ composer.addPass(
 );
 
 // ================= LIGHT =================
-scene.add(new THREE.AmbientLight(0xffffff, 1));
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const light = new THREE.PointLight(0xffffff, 5);
 light.position.set(-5, 5, 0);
 scene.add(light);
@@ -76,63 +80,72 @@ const projects = {
     desc: "No it doesn't open anything :(",
     images: [
       "/textures/keycard_textures1.jpg"
+    ],modelTextures: [
+      "/textures/key_card_texture.png"
     ],
     glow: 1.5,
     outlineSize: 1,
   },
-  Hooodie:{
-    title:"thats a hoodie",
-    desc:"it keeps you warm",
-    images:[
+  Hooodie: {
+    title: "thats a hoodie",
+    desc: "it keeps you warm",
+
+    images: [
+      "/textures/hoodie_projejct.jpg"
+    ],
+
+    modelTextures: [
       "/textures/hoodie_textures.jpg"
+    ],
+    glow: 1,
+    outlineSize: 1.05,
+  },
+  screen: {
+    title: "thats an app",
+    desc: "helps with mental health",
+    images: [
+      "/textures/phone_texture.jpg"
     ],
     glow:1,
     outlineSize:1.05,
   },
-  screen:{
+  phone: {
     title: "thats an app",
     desc: "helps with mental health",
-    images:[
-      "/textures/phone_texture.jpg"
-    ],
-    /*glow:1,
-    outlineSize:1.05,*/
-  },
-  phone:{
-    title: "thats an app",
-    desc: "helps with mental health",
-    images:[
+    images: [
       ""
     ],
-    glow:2,
-    outlineSize:1.05,
+    glow: 2,
+    outlineSize: 1.05,
   },
-  book:{
-    title:"thats me too",
-    desc:" thats a lot to read",
-    images:[
+  book: {
+    title: "thats me too",
+    desc: " thats a lot to read",
+    images: [
       "/textures/about me 2.png",
       "/textures/about me.png"
     ],
-    glow:2,
-    outlineSize:1.05,
+    glow: 2,
+    outlineSize: 1.05,
   },
-  deck:{
+  deck: {
     title: "thats a skateboard",
     desc: "its fun",
-    images:[
-    "/textures/skateboard_back.png",
-    "/textures/skateboard_front.png"
+    images: [
+      "/textures/skateboard_back.png",
+      "/textures/skateboard_front.png"
     ],
-    glow:1.5,
-    outlineSize:0.75,
+    glow: 1.5,
+    outlineSize: 0.75,
   },
-  laptop:{
+  laptop: {
     title: "that was coded",
     desc: "fun littel project",
-    images:[
+    images: [
       "/textures/code.jpg"
     ],
+    glow: 2,
+    outlineSize: 1.05,
   }
 };
 
@@ -176,35 +189,105 @@ loader.load('/ruins.glb', (gltf) => {
     insertAction.clampWhenFinished = true;
   }
 
+  //light
+  model.traverse((obj) => {
+
+  // find blender lights
+  if (obj.name.startsWith("light")) {
+
+    const worldPos = new THREE.Vector3();
+
+    // update transforms first
+    model.updateWorldMatrix(true, true);
+
+    // get correct scaled world position
+    obj.getWorldPosition(worldPos);
+
+    // create optimized three.js light
+    const light = new THREE.PointLight(
+      0xffccaa, // color
+      0.05,      // intensity
+      0.12        // distance
+    );
+
+    light.decay = 2;
+
+    // apply blender position
+    light.position.copy(worldPos);
+
+    // OPTIONAL:
+    // small atmosphere glow helper
+    // const helper = new THREE.PointLightHelper(light, 0.1);
+    // scene.add(helper);
+
+    scene.add(light);
+
+    // disable imported blender light
+    obj.visible = false;
+
+    console.log("LIGHT:", obj.name, light.position);
+  }
+});
+
+  //glow
   model.traverse((child) => {
-    if (!child.isMesh) return;
+  if (!child.isMesh) return;
 
-    const project = projects[child.name];
-    if (!project) return;
+  // safer matching (includes partial match fallback)
+  let key = Object.keys(projects).find(
+    k => child.name?.toLowerCase().includes(k.toLowerCase())
+  );
 
-    const textures = project.images.map(img => {
-      const tex = textureLoader.load(img);
-      tex.flipY = false;
-      tex.colorSpace = THREE.SRGBColorSpace;
+  // HARD fallback for hoodie (your broken case)
+  if (!key && child.name?.toLowerCase().includes("hood")) {
+    key = "Hooodie";
+  }
 
-      // ✅ OPTIMIZATION: anisotropy
-      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const project = projects[key];
+  if (!project) return;
 
-      return tex;
-    });
+  const imageList = project.modelTextures || project.images || [];
 
-    child.userData.project = child.name;
-    child.userData.textures = textures;
+  if (!imageList.length) return; // 🔥 prevents empty texture work
 
-    child.material = new THREE.MeshStandardMaterial({ map: textures[0] });
+  child.userData.project = key;
 
-    // ✅ OPTIMIZATION: cache
-    interactables.push(child);
-    projectObjects[child.name] = child;
+// ONLY create extra textures if modelTextures exists
+if (project.modelTextures) {
 
-    addOutline(child, project.glow, project.outlineSize);
+  const textures = project.modelTextures.map(img => {
+
+    const tex = textureLoader.load(img);
+
+    tex.flipY = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+    return tex;
   });
 
+  child.userData.textures = textures;
+
+  // OPTIONAL:
+  // set first custom texture
+  if (textures[0]) {
+    child.material.map = textures[0];
+  }
+}
+
+// IMPORTANT
+child.material.needsUpdate = true;
+
+  child.material.needsUpdate = true;
+
+  interactables.push(child);
+  projectObjects[key] = child;
+
+  // 🔥 IMPORTANT: skip outline for heavy meshes (fix lag near hoodie)
+  if (project.glow && project.outlineSize) {
+    addOutline(child, project.glow, project.outlineSize);
+  }
+});
   modelReady = true;
 });
 
@@ -274,19 +357,19 @@ function findProjectObject(obj) {
 
 // ================= MOVEMENT (YOUR SYSTEM) =================
 const points = [
-  {pos: new THREE.Vector3(-2.00, -1.00, 2.30),look: new THREE.Vector3(3.00, -1.09, 2.37)},//start
-  {pos: new THREE.Vector3(-0.95, -1.00, 2.30),look: new THREE.Vector3(4.35, -1.14, 2.29)},//key card
-  {pos: new THREE.Vector3(0.60, -1.00, 2.30),look: new THREE.Vector3(5.80, -0.86, 2.32)},//poster
-  {pos: new THREE.Vector3(2.50, -1.00, 2.30),look: new THREE.Vector3(6.93, 1.31, 2.46)},//stairs
-  {pos: new THREE.Vector3(4.15, 0.50, 2.30),look: new THREE.Vector3(4.15, 0.50, -2.70)},//coridor
-  {pos: new THREE.Vector3(4.15, 0.50, 2),look: new THREE.Vector3(4.15, 0.50, -2.70)},//hoodie
-  {pos: new THREE.Vector3(4.15, 0.50, 0.50),look: new THREE.Vector3(4.15, 0.50, -2.70)},//phone
-  {pos: new THREE.Vector3(4.15, 0.50, 0.10),look: new THREE.Vector3(-0.84, 0.20, 0.23)},//coridor end
-  {pos: new THREE.Vector3(2.00, 0.50, 0.10),look: new THREE.Vector3(-3.00, 0.50, 0.00)},//halle halfe
-  {pos: new THREE.Vector3(0, 0.5, 0.1),look: new THREE.Vector3(-3.00, 0.50, -0.00)},//hall end 
-  {pos: new THREE.Vector3(-2.00, 0.50, 0.10),look: new THREE.Vector3(3.00, 0.38, 0.06)},//dome
-  {pos: new THREE.Vector3(-2.00, 0.50, 0.10),look: new THREE.Vector3(0.95, 4.53, 0.25)},//dome up
-  {pos: new THREE.Vector3(-5.00, 0.25, 1.50),look: new THREE.Vector3(-0.19, -0.19, 0.19)}//overview
+  { pos: new THREE.Vector3(-2.00, -1.00, 2.30), look: new THREE.Vector3(3.00, -1.09, 2.37) },//start
+  { pos: new THREE.Vector3(-0.95, -1.00, 2.30), look: new THREE.Vector3(4.35, -1.14, 2.29) },//key card
+  { pos: new THREE.Vector3(0.60, -1.00, 2.30), look: new THREE.Vector3(5.80, -0.86, 2.32) },//poster
+  { pos: new THREE.Vector3(2.50, -1.00, 2.30), look: new THREE.Vector3(6.93, 1.31, 2.46) },//stairs
+  { pos: new THREE.Vector3(4.15, 0.50, 2.30), look: new THREE.Vector3(4.15, 0.50, -2.70) },//coridor
+  { pos: new THREE.Vector3(4.15, 0.50, 2), look: new THREE.Vector3(4.15, 0.50, -2.70) },//hoodie
+  { pos: new THREE.Vector3(4.15, 0.50, 0.50), look: new THREE.Vector3(4.15, 0.50, -2.70) },//phone
+  { pos: new THREE.Vector3(4.15, 0.50, 0.10), look: new THREE.Vector3(-0.84, 0.20, 0.23) },//coridor end
+  { pos: new THREE.Vector3(2.00, 0.50, 0.10), look: new THREE.Vector3(-3.00, 0.50, 0.00) },//halle halfe
+  { pos: new THREE.Vector3(0, 0.5, 0.1), look: new THREE.Vector3(-3.00, 0.50, -0.00) },//hall end 
+  { pos: new THREE.Vector3(-2.00, 0.50, 0.10), look: new THREE.Vector3(3.00, 0.38, 0.06) },//dome
+  { pos: new THREE.Vector3(-2.00, 0.50, 0.10), look: new THREE.Vector3(0.95, 4.53, 0.25) },//dome up
+  { pos: new THREE.Vector3(-5.00, 0.25, 1.50), look: new THREE.Vector3(-0.19, -0.19, 0.19) }//overview
 ];
 
 let currentPoint = 0;
@@ -343,11 +426,13 @@ window.addEventListener('click', () => {
 
   raycaster.setFromCamera(center, camera);
 
-  // ✅ OPTIMIZATION: only interactables
   const hits = raycaster.intersectObjects(interactables, true);
 
   if (hits.length > 0) {
     const obj = findProjectObject(hits[0].object);
+
+    console.log("clicked:", obj?.userData?.project);
+
     if (obj) openProject(obj.userData.project);
   }
 });
@@ -393,16 +478,12 @@ function updateHoverLabel() {
 }
 
 // ================= PROJECT PANEL =================
-let currentImageIndex = 0;
 let activeProjectName = null;
+let currentImageIndex = 0;
 
 const titleEl = document.getElementById("projectTitle");
 const descEl = document.getElementById("projectDesc");
 const projectImageEl = document.getElementById("projectImage");
-
-const closeBtn = document.getElementById("closeBtn");
-const prevBtn = document.getElementById("prevImage");
-const nextBtn = document.getElementById("nextImage");
 
 // OPEN
 function openProject(name) {
@@ -412,14 +493,19 @@ function openProject(name) {
   activeProjectName = name;
   currentImageIndex = 0;
 
+  const images =
+    data.images ||
+    [];
+
   titleEl.textContent = data.title;
   descEl.textContent = data.desc;
-  projectImageEl.src = data.images[0];
+
+  projectImageEl.src = images[0] || "";
 
   panel.classList.add("active");
   overlay.classList.add("active");
 
-  if (controls.isLocked) controls.unlock();
+  controls.unlock();
 }
 
 // CLOSE
@@ -429,42 +515,55 @@ function closeProjectPanel(e) {
   panel.classList.remove("active");
   overlay.classList.remove("active");
 
-  setTimeout(() => {
-    controls.lock();
-  }, 50);
+  activeProjectName = null;
+
+  setTimeout(() => controls.lock(), 50);
 }
 
-function showImage(index) {
+// ================= IMAGE SWITCH =================
+function showImage(dir) {
   if (!activeProjectName) return;
 
   const data = projects[activeProjectName];
-  if (!data) return;
 
-  currentImageIndex = (index + data.images.length) % data.images.length;
+  const uiImages =
+    data.images ||
+    [];
 
-  projectImageEl.src = data.images[currentImageIndex];
+  if (!uiImages.length) return;
 
-  // ✅ use cached object (your optimization)
+  currentImageIndex =
+    (currentImageIndex + dir + uiImages.length) % uiImages.length;
+
+  projectImageEl.src = uiImages[currentImageIndex];
+
   const obj = projectObjects[activeProjectName];
 
-  if (obj) {
-    obj.material.map = obj.userData.textures[currentImageIndex];
+  const modelTextures =
+    data.modelTextures ||
+    data.images ||
+    [];
+
+  if (obj && obj.userData.textures && obj.userData.textures.length) {
+    const texIndex = currentImageIndex % obj.userData.textures.length;
+
+    obj.material.map = obj.userData.textures[texIndex];
     obj.material.needsUpdate = true;
   }
 }
 
-// EVENTS
-closeBtn.addEventListener("click", closeProjectPanel);
+// ================= EVENTS =================
+document.getElementById("closeBtn").addEventListener("click", closeProjectPanel);
 overlay.addEventListener("click", closeProjectPanel);
 
-prevBtn.addEventListener("click", (e) => {
+document.getElementById("prevImage").addEventListener("click", (e) => {
   e.stopPropagation();
-  showImage(currentImageIndex - 1);
+  showImage(-1);
 });
 
-nextBtn.addEventListener("click", (e) => {
+document.getElementById("nextImage").addEventListener("click", (e) => {
   e.stopPropagation();
-  showImage(currentImageIndex + 1);
+  showImage(1);
 });
 
 // ================= PRINT CAM POSITION =================
