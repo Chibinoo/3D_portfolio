@@ -23,7 +23,16 @@ camera.position.set(-2, -1, 2.3);
 
 // ================= SCENE =================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x222222);
+//fog
+{
+  const near=2;
+  const far=5;
+  const color='gray';
+  scene.fog=new THREE.Fog(color, near, far);
+  scene.background=new THREE.Color(color);
+}
+
+//scene.background = new THREE.Color(0x222222);
 
 const textureLoader = new THREE.TextureLoader();
 const controls = new PointerLockControls(camera, document.body);
@@ -457,6 +466,22 @@ function moveTo(i) {
   });
 
   currentPoint = i;
+
+//changing fog values on last point
+if (i === points.length - 1) {
+  gsap.killTweensOf(scene.fog);
+    scene.fog.near = 20;
+    scene.fog.far = 50;
+  } else {
+    gsap.killTweensOf(scene.fog);
+    gsap.to(scene.fog, {
+    near: 2,
+    far: 5,
+    duration: 1,  // ← fade duration
+    delay: 0.5,     // ← wait for camera to finish moving first
+    ease: "power2.inOut"
+  });
+  }
 }
 
 // relock AFTER movement (must be user-triggered → so delay is fine here)
