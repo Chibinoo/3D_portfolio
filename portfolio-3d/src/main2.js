@@ -24,13 +24,9 @@ camera.position.set(-2, -1, 2.3);
 // ================= SCENE =================
 const scene = new THREE.Scene();
 //fog
-{
-  const near=2;
-  const far=5;
-  const color='gray';
-  scene.fog=new THREE.Fog(color, near, far);
-  scene.background=new THREE.Color(color);
-}
+const fogColor = new THREE.Color('gray');
+scene.background = new THREE.Color('gray');
+scene.fog = new THREE.FogExp2(fogColor, 0.255);
 
 //scene.background = new THREE.Color(0x222222);
 
@@ -67,9 +63,14 @@ composer.addPass(
 );
 
 // ================= LIGHT =================
-scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+/*scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const light = new THREE.PointLight(0xffffff, 5);
-light.position.set(-5, 5, 0);
+light.position.set(-5, 5, 0);*/
+const color='lightgray';
+const intensity=4.8;
+const light=new THREE.DirectionalLight(color, intensity);
+light.position.set(0,10,0)
+
 scene.add(light);
 
 // ================= PROJECT DATA =================
@@ -470,18 +471,11 @@ function moveTo(i) {
 //changing fog values on last point
 if (i === points.length - 1) {
   gsap.killTweensOf(scene.fog);
-    scene.fog.near = 20;
-    scene.fog.far = 50;
-  } else {
-    gsap.killTweensOf(scene.fog);
-    gsap.to(scene.fog, {
-    near: 2,
-    far: 5,
-    duration: 1,  // ← fade duration
-    delay: 0.5,     // ← wait for camera to finish moving first
-    ease: "power2.inOut"
-  });
-  }
+  gsap.to(scene.fog, { density: 0.0, duration: 1.5, ease: "power2.inOut" }); // ← no fog at overview
+} else {
+  gsap.killTweensOf(scene.fog);
+  gsap.to(scene.fog, { density: 0.255, duration: 1, delay: 0.4, ease: "power2.inOut" });
+}
 }
 
 // relock AFTER movement (must be user-triggered → so delay is fine here)
