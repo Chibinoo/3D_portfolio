@@ -259,10 +259,9 @@ loader.load('/ruins.glb', (gltf) => {
       // apply blender position
       light.position.copy(worldPos);
 
-      // OPTIONAL:
-      // small atmosphere glow helper
-      // const helper = new THREE.PointLightHelper(light, 0.1);
-      // scene.add(helper);
+      /* //small atmosphere glow helper
+       const helper = new THREE.PointLightHelper(light, 0.1);
+       scene.add(helper);*/
 
       scene.add(light);
 
@@ -540,6 +539,7 @@ function openProject(name) {
 
   activeProjectName = name;
   currentImageIndex = 0;
+  updateNavButtons();
 
   const images =
     data.images ||
@@ -554,6 +554,21 @@ function openProject(name) {
   overlay.classList.add("active");
 
   controls.unlock();
+}
+
+function updateNavButtons() {
+  const data = projects[activeProjectName];
+  if (!data) return;
+
+  const hasMultiple = (data.images?.length ?? 0) > 1;
+
+  const prevBtn = document.getElementById("prevImage");
+  const nextBtn = document.getElementById("nextImage");
+
+  prevBtn.style.opacity = hasMultiple ? "1" : "0.2";
+  nextBtn.style.opacity = hasMultiple ? "1" : "0.2";
+  prevBtn.style.pointerEvents = hasMultiple ? "auto" : "none";
+  nextBtn.style.pointerEvents = hasMultiple ? "auto" : "none";
 }
 
 // CLOSE
@@ -588,6 +603,7 @@ function showImage(dir) {
     (currentImageIndex + dir + uiImages.length) % uiImages.length;
 
   projectImageEl.src = uiImages[currentImageIndex];
+  updateNavButtons();
 
   const obj = projectObjects[activeProjectName];
 
@@ -600,6 +616,7 @@ function showImage(dir) {
     const texIndex = currentImageIndex % obj.userData.textures.length;
 
     obj.material.map = obj.userData.textures[texIndex];
+    obj.material.emissiveMap = obj.userData.textures[texIndex];
     obj.material.needsUpdate = true;
   }
 }
