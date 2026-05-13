@@ -71,7 +71,11 @@ const projects = {
     images: [
       "/textures/poster1_textures.jpg",
       "/textures/poster2_textures.jpg"
+    ], modelTextures: [
+      "/textures/poster1_textures.jpg?v=2",
+      "/textures/poster2_textures.jpg?v=2"
     ],
+    flipY: true,
     glow: 2,
     outlineSize: 1.02,
   },
@@ -80,7 +84,7 @@ const projects = {
     desc: "No it doesn't open anything :(",
     images: [
       "/textures/keycard_textures1.jpg"
-    ],modelTextures: [
+    ], modelTextures: [
       "/textures/key_card_texture.png"
     ],
     glow: 1.5,
@@ -106,8 +110,8 @@ const projects = {
     images: [
       "/textures/phone_texture.jpg"
     ],
-    glow:1,
-    outlineSize:1.05,
+    glow: 1,
+    outlineSize: 1.05,
   },
   phone: {
     title: "thats an app",
@@ -137,6 +141,20 @@ const projects = {
     ],
     glow: 1.5,
     outlineSize: 0.75,
+  },
+  poster2: {
+    title: "Posters2",
+    desc: "A lot of Posters the seconde wowie",
+    images: [
+      "/textures/poster1_textures.jpg",
+      "/textures/poster2_textures.jpg"
+    ], modelTextures: [
+      "/textures/poster1_textures.jpg",
+      "/textures/poster2_textures.jpg"
+    ],
+    flipY: true,
+    glow: 2,
+    outlineSize: 1.02,
   },
   laptop: {
     title: "that was coded",
@@ -168,6 +186,32 @@ function addOutline(mesh, glow = 3, size = 1.03) {
   mesh.add(outline);
 }
 
+// ================= AUTO CYCLE =================
+const autoCycles = {};
+
+function startAutoCycle(obj, delay = 3000) {
+  if (!obj?.userData?.textures?.length) return; // ← guards undefined AND empty array
+  if (obj.userData.textures.length < 2) return; 
+  console.log("startAutoCycle called for:", obj.name, obj.userData.textures);
+  if (!obj?.userData?.textures) return;
+
+  let i = 0;
+
+  autoCycles[obj.name] = setInterval(() => {
+    i = (i + 1) % obj.userData.textures.length;
+    const tex = obj.userData.textures[i];
+    obj.material.map = tex;
+    obj.material.emissiveMap = tex;  // ← add this
+    obj.material.needsUpdate = true;
+  }, delay);
+}
+function stopAutoCycle(name) {
+  if (autoCycles[name]) {
+    clearInterval(autoCycles[name]);
+    delete autoCycles[name];
+  }
+}
+
 // ================= MODEL =================
 const loader = new GLTFLoader();
 
@@ -192,102 +236,103 @@ loader.load('/ruins.glb', (gltf) => {
   //light
   model.traverse((obj) => {
 
-  // find blender lights
-  if (obj.name.startsWith("light")) {
+    // find blender lights
+    if (obj.name.startsWith("light")) {
 
-    const worldPos = new THREE.Vector3();
+      const worldPos = new THREE.Vector3();
 
-    // update transforms first
-    model.updateWorldMatrix(true, true);
+      // update transforms first
+      model.updateWorldMatrix(true, true);
 
-    // get correct scaled world position
-    obj.getWorldPosition(worldPos);
+      // get correct scaled world position
+      obj.getWorldPosition(worldPos);
 
-    // create optimized three.js light
-    const light = new THREE.PointLight(
-      0xffccaa, // color
-      0.05,      // intensity
-      0.12        // distance
-    );
+      // create optimized three.js light
+      const light = new THREE.PointLight(
+        0xffccaa, // color
+        0.05,      // intensity
+        0.12        // distance
+      );
 
-    light.decay = 2;
+      light.decay = 2;
 
-    // apply blender position
-    light.position.copy(worldPos);
+      // apply blender position
+      light.position.copy(worldPos);
 
-    // OPTIONAL:
-    // small atmosphere glow helper
-    // const helper = new THREE.PointLightHelper(light, 0.1);
-    // scene.add(helper);
+      // OPTIONAL:
+      // small atmosphere glow helper
+      // const helper = new THREE.PointLightHelper(light, 0.1);
+      // scene.add(helper);
 
-    scene.add(light);
+      scene.add(light);
 
-    // disable imported blender light
-    obj.visible = false;
+      // disable imported blender light
+      obj.visible = false;
 
-    console.log("LIGHT:", obj.name, light.position);
-  }
-});
+      //debug light
+      //console.log("LIGHT:", obj.name, light.position);
+    }
+  });
 
   //glow
   model.traverse((child) => {
-  if (!child.isMesh) return;
+    if (!child.isMesh) return;
 
-  // safer matching (includes partial match fallback)
-  let key = Object.keys(projects).find(
-    k => child.name?.toLowerCase().includes(k.toLowerCase())
-  );
+    let key = Object.keys(projects).find(
+      k => child.name?.toLowerCase().includes(k.toLowerCase())
+    );
 
-  // HARD fallback for hoodie (your broken case)
-  if (!key && child.name?.toLowerCase().includes("hood")) {
-    key = "Hooodie";
-  }
+    if (!key && child.name?.toLowerCase().includes("hood")) {
+      key = "Hooodie";
+    }
 
-  const project = projects[key];
-  if (!project) return;
+    const project = projects[key];
+    if (!project) return;
 
-  const imageList = project.modelTextures || project.images || [];
+    child.userData.project = key;
 
-  if (!imageList.length) return; // 🔥 prevents empty texture work
+    let textures = [];
 
-  child.userData.project = key;
+    if (project.modelTextures) {
+      textures = project.modelTextures.map((img, index) => {
+        const tex = textureLoader.load(img, (loadedTex) => {
+          textures[index] = loadedTex;
+          child.userData.textures = textures;
 
-// ONLY create extra textures if modelTextures exists
-if (project.modelTextures) {
+          if (index === 0) {
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(mat => {
+              const m = mat.clone();
+              m.map = loadedTex;
+              m.emissiveMap = loadedTex;
+              m.emissive = new THREE.Color(1, 1, 1);
+              m.emissiveIntensity = 0.5;
+              m.needsUpdate = true;
+              child.material = m;
+            });
+          }
 
-  const textures = project.modelTextures.map(img => {
+          if (index === project.modelTextures.length - 1 && textures.length > 1) {
+            startAutoCycle(child);
+          }
+        });
 
-    const tex = textureLoader.load(img);
+        tex.flipY = project.flipY ?? false;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        return tex;
+      });
 
-    tex.flipY = false;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      child.userData.textures = textures;
+    }
 
-    return tex;
+    interactables.push(child);
+    projectObjects[key] = child;
+
+    if (project.glow && project.outlineSize) {
+      addOutline(child, project.glow, project.outlineSize);
+    }
   });
-
-  child.userData.textures = textures;
-
-  // OPTIONAL:
-  // set first custom texture
-  if (textures[0]) {
-    child.material.map = textures[0];
-  }
-}
-
-// IMPORTANT
-child.material.needsUpdate = true;
-
-  child.material.needsUpdate = true;
-
-  interactables.push(child);
-  projectObjects[key] = child;
-
-  // 🔥 IMPORTANT: skip outline for heavy meshes (fix lag near hoodie)
-  if (project.glow && project.outlineSize) {
-    addOutline(child, project.glow, project.outlineSize);
-  }
-});
   modelReady = true;
 });
 
@@ -490,6 +535,9 @@ function openProject(name) {
   const data = projects[name];
   if (!data) return;
 
+  const obj = projectObjects[name];
+  if (obj?.userData?.textures?.length > 1) startAutoCycle(obj);
+
   activeProjectName = name;
   currentImageIndex = 0;
 
@@ -517,6 +565,10 @@ function closeProjectPanel(e) {
 
   activeProjectName = null;
 
+  if (activeProjectName) {
+    const obj = projectObjects[activeProjectName];  // ← get mesh
+    if (obj) startAutoCycle(obj); 
+  }
   setTimeout(() => controls.lock(), 50);
 }
 
